@@ -102,9 +102,6 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
                   {leavePersonnel.length} Soldiers On Leave
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono">
-                10 Med Regt Arty Privilege (P/Lve) and Casual Leave (C/Lve) Nominal Roll
-              </p>
             </div>
           </div>
 

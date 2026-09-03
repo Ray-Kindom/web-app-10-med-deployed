@@ -257,15 +257,9 @@ export const OutOfUnitManagerModal: React.FC<OutOfUnitManagerModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-bold text-white tracking-wide">
-                  Updt Out Of Unit / আউট অফ ইউনিট ব্যবস্থাপনা
+                  Updt Out Of Unit
                 </h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-rose-300 border border-rose-500/30">
-                  Direct 1-Click Navigation
-                </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Manage ERE, Mission, Attachment, FDMN, CMH, Courses, Command Duties & Leaves with instant 1-click category switching
-              </p>
             </div>
           </div>
           <button
@@ -344,9 +338,6 @@ export const OutOfUnitManagerModal: React.FC<OutOfUnitManagerModalProps> = ({
                   Total Active: {outOfUnitSoldiers.length}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {activeCategoryMeta?.description}
-              </p>
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -671,12 +662,7 @@ export const OutOfUnitManagerModal: React.FC<OutOfUnitManagerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <div className="flex items-center gap-3">
-            <span>
-              1-Click Category Switching Active: Click any tab above to switch instantly between categories.
-            </span>
-          </div>
+        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex items-center justify-end text-xs text-slate-400">
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors cursor-pointer"
