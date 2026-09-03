@@ -347,9 +347,6 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                   {isBsm ? `${activeTab} View` : 'Regimental Overview'}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono mt-0.5">
-                10 Medium Regiment Artillery — Live Duty Points & Nominal Breakdown
-              </p>
             </div>
           </div>
 
@@ -880,14 +877,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>
-              Values auto-saved in live state and synchronized with unit nominal rolls.
-            </span>
-          </div>
-
+        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-end gap-3 text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsEditing(!isEditing)}

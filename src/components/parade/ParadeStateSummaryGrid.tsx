@@ -39,9 +39,6 @@ export const ParadeStateSummaryGrid: React.FC<ParadeStateSummaryGridProps> = ({
               0630 HRS MORNING STATE
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Consolidated sub-unit parade roll for 10 Med Regt Arty (Click any cell or header to view nominal details)
-          </p>
         </div>
 
         {onOpenPrintModal && (
@@ -50,7 +47,7 @@ export const ParadeStateSummaryGrid: React.FC<ParadeStateSummaryGridProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors self-start sm:self-auto"
           >
             <Printer className="w-3.5 h-3.5 text-rose-400" />
-            <span>Generate Official Printable Sheet</span>
+            <span>Print Sheet</span>
           </button>
         )}
       </div>

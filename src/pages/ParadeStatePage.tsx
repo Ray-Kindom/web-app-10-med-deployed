@@ -85,23 +85,17 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
     <div className="space-y-6">
       {/* 4 PRIMARY PARADE STATE TYPE BOXES/CARDS (Morning, Second Period, Games, Roll Call + Dynamic) */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
-          <span className="font-bold text-white uppercase tracking-wider">
-            Daily Muster Types:
-          </span>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline text-slate-400">Click any session card to open sheet, view date, print & download</span>
-            {isRsm && (
-              <button
-                onClick={() => setIsAddTypeModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Parade Type</span>
-              </button>
-            )}
+        {isRsm && (
+          <div className="flex justify-end px-1">
+            <button
+              onClick={() => setIsAddTypeModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Parade Type</span>
+            </button>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {paradeTypes.map((type) => {
@@ -128,9 +122,6 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
                     <h3 className="text-base font-bold text-white group-hover:text-rose-300 transition-colors font-sans">
                       {type.name}
                     </h3>
-                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                      {selectedParadeDate} • {isBsm ? assignedBty : 'All 4 Batteries'}
-                    </p>
                   </div>
                 </div>
 
@@ -157,12 +148,9 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
           onClick={() => setIsLeaveModalOpen(true)}
           className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-purple-500/30 hover:border-purple-500 flex items-center justify-between transition-all group text-left cursor-pointer"
         >
-          <div>
-            <div className="flex items-center gap-2">
-              <PlaneTakeoff className="w-4 h-4 text-purple-400" />
-              <span className="font-bold text-white text-xs font-mono">Lve (Leave)</span>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1">P/Lve & C/Lve Nominal</p>
+          <div className="flex items-center gap-2">
+            <PlaneTakeoff className="w-4 h-4 text-purple-400" />
+            <span className="font-bold text-white text-xs font-mono">Lve (Leave)</span>
           </div>
           <span className="text-sm font-mono font-bold text-purple-400 bg-purple-950/60 px-2 py-1 rounded border border-purple-500/30">
             {totals.totalLeave}
@@ -173,12 +161,9 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
           onClick={() => setIsCourseModalOpen(true)}
           className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-cyan-500/30 hover:border-cyan-500 flex items-center justify-between transition-all group text-left cursor-pointer"
         >
-          <div>
-            <div className="flex items-center gap-2">
-              <GraduationCap className="w-4 h-4 text-cyan-400" />
-              <span className="font-bold text-white text-xs font-mono">Course</span>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1">Cadres & End Dates</p>
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-4 h-4 text-cyan-400" />
+            <span className="font-bold text-white text-xs font-mono">Course</span>
           </div>
           <span className="text-sm font-mono font-bold text-cyan-400 bg-cyan-950/60 px-2 py-1 rounded border border-cyan-500/30">
             {totals.totalCourse}
@@ -189,12 +174,9 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
           onClick={() => setIsSickModalOpen(true)}
           className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-amber-500/30 hover:border-amber-500 flex items-center justify-between transition-all group text-left cursor-pointer"
         >
-          <div>
-            <div className="flex items-center gap-2">
-              <HeartPulse className="w-4 h-4 text-amber-400" />
-              <span className="font-bold text-white text-xs font-mono">CMH/Sick</span>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1">CMH & Sic Reports</p>
+          <div className="flex items-center gap-2">
+            <HeartPulse className="w-4 h-4 text-amber-400" />
+            <span className="font-bold text-white text-xs font-mono">CMH/Sick</span>
           </div>
           <span className="text-sm font-mono font-bold text-amber-400 bg-amber-950/60 px-2 py-1 rounded border border-amber-500/30">
             {totals.totalSick}
@@ -205,12 +187,9 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
           onClick={() => setIsComdModalOpen(true)}
           className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-indigo-500/30 hover:border-indigo-500 flex items-center justify-between transition-all group text-left cursor-pointer"
         >
-          <div>
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-indigo-400" />
-              <span className="font-bold text-white text-xs font-mono">COMD</span>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1">Temp Duty & Attached</p>
+          <div className="flex items-center gap-2">
+            <Compass className="w-4 h-4 text-indigo-400" />
+            <span className="font-bold text-white text-xs font-mono">COMD</span>
           </div>
           <span className="text-sm font-mono font-bold text-indigo-400 bg-indigo-950/60 px-2 py-1 rounded border border-indigo-500/30">
             {totals.totalTempDuty + totals.totalAttached}

@@ -54,7 +54,7 @@ export const ParadeActionControls: React.FC<ParadeActionControlsProps> = ({ batt
       >
         <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all pointer-events-none" />
 
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-gradient-to-br from-rose-500/20 to-red-500/10 border border-rose-500/30 text-rose-400 group-hover:scale-105 transition-transform">
               <Layers className="w-6 h-6" />
@@ -68,27 +68,15 @@ export const ParadeActionControls: React.FC<ParadeActionControlsProps> = ({ batt
                   {totalPoints} Points
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                দৈনিক প্যারেড স্টেট ব্যবস্থাপনা (Offr, JCO & OR List Table)
-              </p>
             </div>
           </div>
 
-          <div className="p-1.5 rounded-lg bg-slate-800/80 group-hover:bg-rose-600 text-slate-400 group-hover:text-white transition-all">
-            <ChevronRight className="w-4 h-4" />
+          <div className="flex items-center gap-2 text-rose-400 font-bold text-xs">
+            <span>Open Table</span>
+            <div className="p-1.5 rounded-lg bg-slate-800/80 group-hover:bg-rose-600 text-slate-400 group-hover:text-white transition-all">
+              <ChevronRight className="w-4 h-4" />
+            </div>
           </div>
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Calculator className="w-3.5 h-3.5 text-rose-400" />
-            <span>Auto-Calculated Summary (GPT, Kote, RP, MT & 29 Points)</span>
-          </div>
-
-          <span className="text-[11px] font-bold text-rose-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
-            <span>Open Parade Table</span>
-            <span>→</span>
-          </span>
         </div>
       </div>
 
@@ -99,7 +87,7 @@ export const ParadeActionControls: React.FC<ParadeActionControlsProps> = ({ batt
       >
         <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-all pointer-events-none" />
 
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border border-cyan-500/30 text-cyan-400 group-hover:scale-105 transition-transform">
               <ArrowRightLeft className="w-6 h-6" />
@@ -113,27 +101,15 @@ export const ParadeActionControls: React.FC<ParadeActionControlsProps> = ({ batt
                   {outOfUnitCount} Active Out
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                আউট অফ ইউনিট ব্যবস্থাপনা (ERE, Msn, Att, FDMN, CMH, Course, Comd, Leaves)
-              </p>
             </div>
           </div>
 
-          <div className="p-1.5 rounded-lg bg-slate-800/80 group-hover:bg-cyan-600 text-slate-400 group-hover:text-white transition-all">
-            <ChevronRight className="w-4 h-4" />
+          <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs">
+            <span>Manage</span>
+            <div className="p-1.5 rounded-lg bg-slate-800/80 group-hover:bg-cyan-600 text-slate-400 group-hover:text-white transition-all">
+              <ChevronRight className="w-4 h-4" />
+            </div>
           </div>
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Plane className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Direct 1-Click Navigation across all Out-of-Unit categories</span>
-          </div>
-
-          <span className="text-[11px] font-bold text-cyan-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
-            <span>Manage Categories</span>
-            <span>→</span>
-          </span>
         </div>
       </div>
     </div>
