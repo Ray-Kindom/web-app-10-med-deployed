@@ -17,6 +17,9 @@ import {
   Search,
   Sparkles,
   CheckCircle2,
+  Camera,
+  Upload,
+  Trash2,
 } from 'lucide-react';
 
 interface UserManagementModalProps {
@@ -26,7 +29,7 @@ interface UserManagementModalProps {
   editUser?: UserAccount | null;
 }
 
-const AVAILABLE_BATTERIES: Battery[] = ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'];
+const AVAILABLE_BATTERIES: Battery[] = ['P Bty', 'Q Bty', 'R Bty', 'HQ Bty'];
 
 const MILITARY_RANKS: { rank: string; category: string }[] = [
   { rank: 'Lt Col', category: 'Offr' },
@@ -114,7 +117,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [snkNo, setSnkNo] = useState('');
-  const [assignedBatteries, setAssignedBatteries] = useState<Battery[]>(['HQ Bty']);
+  const [assignedBatteries, setAssignedBatteries] = useState<Battery[]>(['P Bty']);
+  const [avatar, setAvatar] = useState<string | undefined>(undefined);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
@@ -124,14 +128,15 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setRole(editUser.role || 'Offr');
       setAccessLevel(editUser.accessLevel || '');
       setUsername(editUser.username || '');
-      setPassword(editUser.password || '••••••••');
+      setPassword(editUser.password || '');
       setSnkNo(editUser.snkNo || '');
+      setAvatar(editUser.avatar || undefined);
       if (editUser.assignedBatteries && editUser.assignedBatteries.length > 0) {
         setAssignedBatteries(editUser.assignedBatteries);
       } else if (editUser.assignedBattery) {
         setAssignedBatteries([editUser.assignedBattery]);
       } else {
-        setAssignedBatteries(['HQ Bty', 'P Bty', 'Q Bty', 'R Bty']);
+        setAssignedBatteries(['P Bty', 'Q Bty', 'R Bty', 'HQ Bty']);
       }
       setSelectedTradeInfo(isOfficerRank(editUser.rank) ? 'No Trade (Officer)' : '');
       setSearchFeedback(null);
@@ -144,7 +149,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setUsername('');
       setPassword('');
       setSnkNo('');
-      setAssignedBatteries(['HQ Bty', 'P Bty', 'Q Bty', 'R Bty']);
+      setAvatar(undefined);
+      setAssignedBatteries(['P Bty', 'Q Bty', 'R Bty', 'HQ Bty']);
       setSelectedTradeInfo('No Trade (Officer)');
       setSearchFeedback(null);
     }
@@ -152,6 +158,21 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     setShowPassword(false);
     setErrors({});
   }, [editUser, isOpen]);
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (PNG, JPG, WebP)');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const result = evt.target?.result as string;
+      if (result) setAvatar(result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // When rank changes, check if it's an officer (Officers have NO trade)
   const handleRankChange = (newRank: string) => {
@@ -301,10 +322,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       role,
       accessLevel: accessLevel.trim() || 'Standard Access',
       username: cleanUsername,
-      password: password.trim() || (editUser?.password ?? '123456'),
+      password: password.trim() || (editUser?.password ?? ''),
       snkNo: snkNo.trim() || undefined,
+      avatar: avatar || undefined,
       assignedBatteries,
-      assignedBattery: assignedBatteries[0] || 'HQ Bty',
+      assignedBattery: assignedBatteries[0] || 'P Bty',
     };
 
     onSaveUser(userData, editUser?.id);
@@ -402,6 +424,49 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* User Photo Upload Section */}
+          <div className="flex items-center gap-4 p-3 rounded-xl bg-slate-950 border border-slate-800">
+            {avatar ? (
+              <div className="relative group">
+                <img
+                  src={avatar}
+                  alt="User Avatar"
+                  className="w-14 h-14 rounded-full object-cover border-2 border-rose-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAvatar(undefined)}
+                  className="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-1 hover:bg-rose-500"
+                  title="Remove Photo"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-slate-900 border border-dashed border-slate-700 flex items-center justify-center text-slate-500">
+                <Camera className="w-6 h-6" />
+              </div>
+            )}
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-200 mb-1">
+                User Profile Photo
+              </label>
+              <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer border border-slate-700 transition-colors">
+                <Upload className="w-3.5 h-3.5 text-rose-400" />
+                <span>{avatar ? 'Change Picture' : 'Upload Picture'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </label>
+              <p className="text-[10px] text-slate-500 mt-1">
+                JPG, PNG or WebP. Will display in header and login card.
+              </p>
+            </div>
+          </div>
+
           {/* Row 1: Name & Rank */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">

@@ -114,9 +114,18 @@ export const OutOfUnitManagerModal: React.FC<OutOfUnitManagerModalProps> = ({
     });
   }, [personnelList, currentCategory, selectedBattery, searchQuery]);
 
+  // Check if current user is a BSM
+  const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
+  const bsmBattery = currentUser.assignedBattery;
+
   // Available soldiers for selection in Add Modal
+  // If BSM: defaults to only suggesting their own battery troops; if search matches another bty, warns user
   const availableSoldiers = useMemo(() => {
     return personnelList.filter((p) => {
+      // If BSM and no search query, only suggest their own battery
+      if (isBsm && bsmBattery && !soldierSearchQuery.trim() && p.battery !== bsmBattery) {
+        return false;
+      }
       if (selectedBattery !== 'All' && p.battery !== selectedBattery) return false;
       if (soldierSearchQuery.trim()) {
         const q = soldierSearchQuery.toLowerCase();
@@ -129,7 +138,7 @@ export const OutOfUnitManagerModal: React.FC<OutOfUnitManagerModalProps> = ({
       }
       return true;
     });
-  }, [personnelList, selectedBattery, soldierSearchQuery]);
+  }, [personnelList, selectedBattery, soldierSearchQuery, isBsm, bsmBattery]);
 
   // Selected soldier details for preview
   const selectedSoldier = useMemo(() => {
@@ -185,6 +194,12 @@ export const OutOfUnitManagerModal: React.FC<OutOfUnitManagerModalProps> = ({
     e.preventDefault();
     if (!selectedPersonnelId) {
       alert('Please select a soldier to assign to ' + currentCategory);
+      return;
+    }
+
+    const targetPerson = personnelList.find((p) => p.id === selectedPersonnelId);
+    if (isBsm && bsmBattery && targetPerson && targetPerson.battery !== bsmBattery) {
+      alert(`⚠️ এই সদস্য ${targetPerson.battery}-এর। আপনি ${currentUser.role} হিসেবে শুধুমাত্র ${bsmBattery}-এর তথ্য এন্ট্রি/পরিবর্তন করতে পারবেন।`);
       return;
     }
 
@@ -408,12 +423,20 @@ export const OutOfUnitManagerModal: React.FC<OutOfUnitManagerModalProps> = ({
                     <option value="" disabled>
                       -- Choose Soldier ({availableSoldiers.length} available) --
                     </option>
-                    {availableSoldiers.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.snkNo} {p.rk} {p.name} ({p.battery} - {p.trade})
-                      </option>
-                    ))}
+                    {availableSoldiers.map((p) => {
+                      const isOtherBty = isBsm && bsmBattery && p.battery !== bsmBattery;
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {p.snkNo} {p.rk} {p.name} ({p.battery} - {p.trade}) {isOtherBty ? '⚠️ [অন্য ব্যাটারি]' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
+                  {selectedSoldier && isBsm && bsmBattery && selectedSoldier.battery !== bsmBattery && (
+                    <div className="mt-1.5 p-2 rounded-lg bg-rose-950/80 border border-rose-500 text-rose-200 text-[11px] leading-tight">
+                      ⚠️ সতর্কতা: ইনি <strong className="text-white">{selectedSoldier.battery}</strong>-এর সদস্য! আপনি {currentUser.role} হিসেবে শুধুমাত্র {bsmBattery}-এর সদস্য এন্ট্রি করতে পারবেন।
+                    </div>
+                  )}
                 </div>
 
                 {/* Destination / Details */}

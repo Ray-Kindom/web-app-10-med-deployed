@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
+import { TopModuleNavBar } from './components/common/TopModuleNavBar';
 import { PersonnelDossierModal } from './components/personnel/PersonnelDossierModal';
 import { AddPersonnelModal } from './components/personnel/AddPersonnelModal';
 import { ParadeStatePrintSheet } from './components/parade/ParadeStatePrintSheet';
@@ -127,8 +128,9 @@ const AppContent: React.FC = () => {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 lg:pl-72 p-4 sm:p-6 lg:p-8 min-w-0">
-          <div className="max-w-6xl mx-auto">{renderActivePage()}</div>
+        <main className="flex-1 lg:pl-72 min-w-0 flex flex-col">
+          <TopModuleNavBar />
+          <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">{renderActivePage()}</div>
         </main>
       </div>
 

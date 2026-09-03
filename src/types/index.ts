@@ -15,9 +15,9 @@ export const isOfficerRank = (rank?: string): boolean => {
   return OFFICER_RANKS.includes(rank);
 };
 
-export type Battery = 'HQ Bty' | 'P Bty' | 'Q Bty' | 'R Bty';
+export type Battery = 'P Bty' | 'Q Bty' | 'R Bty' | 'HQ Bty';
 
-export const ALL_BATTERIES: Battery[] = ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'];
+export const ALL_BATTERIES: Battery[] = ['P Bty', 'Q Bty', 'R Bty', 'HQ Bty'];
 
 export type MilitaryRank =
   | 'Lt Col'
@@ -178,7 +178,44 @@ export interface DailyParadePoint {
     'Q Bty': ParadePointCount;
     'R Bty': ParadePointCount;
   };
-  rsmSuggested?: Partial<ParadePointCount>;
+}
+
+export type ParadeSessionType = 'Morning' | 'Second Period' | 'Games' | 'Roll Call' | string;
+
+export type ParadeRecordStatus =
+  | 'Draft'
+  | 'Submitted'
+  | 'Pending RSM Confirmation'
+  | 'Edited by RSM'
+  | 'Confirmed'
+  | 'Finalized';
+
+export interface ParadeTypeDefinition {
+  id: string;
+  name: string;
+  order: number;
+  isActive: boolean;
+  headings?: string[]; // Heading ids/names associated
+  createdAt?: string;
+  createdBy?: string;
+}
+
+export interface DateWiseParadeRecord {
+  id: string; // [date]_[typeId]_[battery]
+  date: string; // YYYY-MM-DD
+  typeId: string; // e.g. 'Morning', 'Second Period', etc.
+  battery: Battery;
+  status: ParadeRecordStatus;
+  counts: Record<string, ParadePointCount>; // pointId -> { offr, jco, or }
+  lastUpdated: string;
+  updatedBy?: string;
+  submittedAt?: string;
+  submittedBy?: string;
+  confirmedAt?: string;
+  confirmedBy?: string;
+  finalizedAt?: string;
+  finalizedBy?: string;
+  editedByRsm?: boolean;
 }
 
 export interface BatteryParadeSummary {

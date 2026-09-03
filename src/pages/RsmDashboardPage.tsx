@@ -18,6 +18,7 @@ import {
   Calendar,
   UserPlus,
   Printer,
+  Download,
 } from 'lucide-react';
 
 interface RsmDashboardPageProps {
@@ -37,6 +38,9 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
     addDutyAssignment,
     getRegimentalTotals,
     showNotification,
+    paradeBatteryStatus,
+    setBatteryParadeStatus,
+    dailyParadePoints,
   } = useApp();
 
   const totals = getRegimentalTotals();
@@ -77,7 +81,7 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
   return (
     <div className="space-y-6">
       {/* RSM Command Banner */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 shadow-xl space-y-3">
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -85,22 +89,31 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
                 Regimental Sergeant Major (RSM) Console
               </span>
               <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">
-                DISCIPLINE & GUARDS
+                DISCIPLINE & PARADE STATE
               </span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight font-sans mt-1">
-              RSM Consolidated Muster & Guard Mounting Roster
+              RSM Consolidated Muster & Parade State Dashboard
             </h1>
             <p className="text-xs text-slate-400 font-mono">
-              Regimental Quarter Guard, RP Roster, Armoury Security, and Lines Discipline.
+              Full Regiment Status Verification, Battery Confirmation, and Guards Roster.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Download Full Regiment 1-Page Parade State */}
+            <button
+              onClick={onOpenPrintModal}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Download Parade State</span>
+            </button>
+
             {onOpenAddModal && (
               <button
                 onClick={onOpenAddModal}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950/40 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950/40 transition-colors cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span>Enlist Soldier</span>
@@ -108,18 +121,69 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
             )}
             <button
               onClick={() => setDutyModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-950/40 transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-950/40 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Detail Guard Shift</span>
             </button>
             <button
               onClick={onOpenPrintModal}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5 text-rose-400" />
               <span>Print State</span>
             </button>
+          </div>
+        </div>
+
+        {/* Battery Confirmation & Last Update Bar for RSM */}
+        <div className="pt-3 border-t border-slate-800/80">
+          <div className="text-[11px] font-mono text-slate-400 mb-2 uppercase font-semibold">
+            Battery Parade State Submissions & Confirmation Status:
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {(['P Bty', 'Q Bty', 'R Bty', 'HQ Bty'] as const).map((bty) => {
+              const bStat = paradeBatteryStatus[bty] || { status: 'Pending', lastUpdated: '0630 HRS' };
+              const isConfirmed = bStat.status === 'Confirmed';
+              const btyPersonnel = personnelList.filter((p) => p.battery === bty);
+              const presentCount = btyPersonnel.filter((p) => p.status === 'Present').length;
+
+              return (
+                <div
+                  key={bty}
+                  className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between gap-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-white font-mono">{bty}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                        isConfirmed
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      }`}
+                    >
+                      {isConfirmed ? 'Confirmed' : 'Pending'}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 font-mono flex items-center justify-between">
+                    <span>Present: <strong className="text-emerald-400">{presentCount}</strong>/{btyPersonnel.length}</span>
+                    <span className="text-[10px] text-slate-500">Updt: {bStat.lastUpdated}</span>
+                  </div>
+
+                  <button
+                    onClick={() => setBatteryParadeStatus(bty, isConfirmed ? 'Pending' : 'Confirmed')}
+                    className={`w-full py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                      isConfirmed
+                        ? 'bg-slate-800 hover:bg-slate-750 text-slate-300 border-slate-700'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-950/40'
+                    }`}
+                  >
+                    {isConfirmed ? 'Revoke Confirmation' : 'Approve & Confirm'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

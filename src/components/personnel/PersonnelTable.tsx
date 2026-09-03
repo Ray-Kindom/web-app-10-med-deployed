@@ -35,10 +35,11 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
   allowStatusEdits = true,
   title,
 }) => {
-  const { updateParadeStatus, currentUser, showNotification } = useApp();
+  const { updateParadeStatus, currentUser, showNotification, searchQuery, setSearchQuery } = useApp();
 
-  // Filter States
-  const [searchTerm, setSearchTerm] = useState('');
+  // Filter States - synced with header search query
+  const [localSearchTerm, setLocalSearchTerm] = useState('');
+  const activeSearch = searchQuery.trim() ? searchQuery : localSearchTerm;
   const [selectedRank, setSelectedRank] = useState<string>('All');
   const [selectedTrade, setSelectedTrade] = useState<string>('All');
   const [selectedBlood, setSelectedBlood] = useState<string>('All');
@@ -95,21 +96,21 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
     { value: 'AB-', label: 'AB-' },
   ];
 
-  // Battery Filter Options
+  // Battery Filter Options - Serial: P Bty, Q Bty, R Bty, HQ Bty
   const batteryFilterOptions = [
     { value: 'All', label: 'All Batteries' },
-    { value: 'HQ Bty', label: 'HQ Bty' },
     { value: 'P Bty', label: 'P Bty' },
     { value: 'Q Bty', label: 'Q Bty' },
     { value: 'R Bty', label: 'R Bty' },
+    { value: 'HQ Bty', label: 'HQ Bty' },
   ];
 
   // Filter Logic
   const filteredPersonnel = useMemo(() => {
     return personnel.filter((person) => {
       // 1. Text Search across SnkNo, Name, Rank, Trade, Battery, Status, Blood
-      if (searchTerm.trim()) {
-        const query = searchTerm.toLowerCase().trim();
+      if (activeSearch.trim()) {
+        const query = activeSearch.toLowerCase().trim();
         const matchesQuery =
           person.snkNo.toLowerCase().includes(query) ||
           person.name.toLowerCase().includes(query) ||
@@ -162,7 +163,7 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
 
       return true;
     });
-  }, [personnel, searchTerm, selectedRank, selectedTrade, selectedBlood, selectedBattery, fixedBattery, selectedStatus]);
+  }, [personnel, activeSearch, selectedRank, selectedTrade, selectedBlood, selectedBattery, fixedBattery, selectedStatus]);
 
   const handleQuickStatusChange = (personId: string, newStatus: ParadeStatus) => {
     updateParadeStatus(personId, newStatus);
@@ -172,7 +173,7 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
 
   const handlePrintFilteredNominal = () => {
     exportNominalRollToPdf(filteredPersonnel, {
-      searchQuery: searchTerm,
+      searchQuery: activeSearch,
       battery: fixedBattery || selectedBattery,
       specificRank: selectedRank,
       trade: selectedTrade,
@@ -183,7 +184,7 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
 
   const handleWordExport = () => {
     exportNominalRollToWord(filteredPersonnel, {
-      searchQuery: searchTerm,
+      searchQuery: activeSearch,
       battery: fixedBattery || selectedBattery,
       specificRank: selectedRank,
       trade: selectedTrade,
@@ -193,7 +194,8 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
   };
 
   const handleResetFilters = () => {
-    setSearchTerm('');
+    setLocalSearchTerm('');
+    setSearchQuery('');
     setSelectedRank('All');
     setSelectedTrade('All');
     setSelectedBlood('All');
@@ -202,7 +204,7 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
   };
 
   const hasActiveFilters =
-    searchTerm !== '' ||
+    activeSearch !== '' ||
     selectedRank !== 'All' ||
     selectedTrade !== 'All' ||
     selectedBlood !== 'All' ||
@@ -302,8 +304,11 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={activeSearch}
+              onChange={(e) => {
+                setLocalSearchTerm(e.target.value);
+                setSearchQuery(e.target.value);
+              }}
               placeholder="Search No, Name..."
               className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-rose-500 font-sans"
             />

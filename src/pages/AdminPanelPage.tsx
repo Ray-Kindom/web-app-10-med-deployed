@@ -341,9 +341,21 @@ export const AdminPanelPage: React.FC = () => {
                           {/* User / Rank */}
                           <td className="p-3 font-semibold text-white">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-mono font-bold text-xs text-amber-400 shadow-inner">
-                                {u.rank.slice(0, 2)}
-                              </div>
+                              {u.avatar ? (
+                                <img
+                                  src={u.avatar}
+                                  alt={u.name}
+                                  className="w-8 h-8 rounded-full object-cover border border-rose-500/50"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-mono font-bold text-xs text-amber-400 shadow-inner">
+                                  {(() => {
+                                    const parts = (u.name || '').trim().split(/\s+/);
+                                    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+                                    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                                  })()}
+                                </div>
+                              )}
                               <div>
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-bold text-slate-100">{u.name}</span>

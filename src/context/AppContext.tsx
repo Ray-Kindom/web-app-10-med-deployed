@@ -11,6 +11,9 @@ import {
   DailyParadePoint,
   ParadePointCount,
   OutOfUnitCategory,
+  ParadeTypeDefinition,
+  DateWiseParadeRecord,
+  ParadeRecordStatus,
 } from '../types';
 import {
   INITIAL_PERSONNEL,
@@ -83,7 +86,25 @@ interface AppContextType {
   setRsmPointSuggestion: (pointId: string, suggestion: Partial<ParadePointCount>) => void;
   addDailyParadePoint: (name: string, enabledBatteries?: Battery[], initialCounts?: ParadePointCount) => void;
   deleteDailyParadePoint: (pointId: string) => void;
-  toggleDailyParadePointActive: (pointId: string, active: boolean) => void;
+  paradeBatteryStatus: Record<Battery, { status: 'Pending' | 'Confirmed'; lastUpdated: string; confirmedBy?: string }>;
+  setBatteryParadeStatus: (battery: Battery, status: 'Pending' | 'Confirmed') => void;
+
+  // Date-wise & Dynamic Parade State System
+  selectedParadeDate: string;
+  setSelectedParadeDate: (date: string) => void;
+  paradeTypes: ParadeTypeDefinition[];
+  addParadeType: (name: string, headings?: string[]) => void;
+  paradeRecords: Record<string, DateWiseParadeRecord>; // key: [date]_[typeId]_[battery]
+  getParadeRecord: (date: string, typeId: string, battery: Battery) => DateWiseParadeRecord;
+  saveParadeRecordCounts: (
+    date: string,
+    typeId: string,
+    battery: Battery,
+    counts: Record<string, ParadePointCount>,
+    submitStatus?: ParadeRecordStatus
+  ) => void;
+  confirmBatteryParadeRecord: (date: string, typeId: string, battery: Battery) => void;
+  finalizeParadeType: (date: string, typeId: string) => void;
 
   // Out Of Unit Management
   assignOutOfUnit: (
@@ -129,6 +150,8 @@ const STORAGE_KEYS = {
   LOGS: '10med_logs_v1',
   LOGO: '10med_custom_logo_v1',
   PARADE_POINTS: '10med_parade_points_v1',
+  PARADE_TYPES: '10med_parade_types_v1',
+  PARADE_RECORDS: '10med_parade_records_v1',
   AUTH_STATUS: '10med_auth_status_v2',
   ACTIVE_PAGE: '10med_active_page_v2',
 };
@@ -258,6 +281,258 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dailyParadeModalOpen, setDailyParadeModalOpen] = useState<boolean>(false);
   const [outOfUnitModalOpen, setOutOfUnitModalOpen] = useState<boolean>(false);
   const [activeOutOfUnitCategory, setActiveOutOfUnitCategory] = useState<OutOfUnitCategory>('Msn');
+
+  // Battery Parade Confirmation & Status Tracking
+  const [paradeBatteryStatus, setParadeBatteryStatusState] = useState<
+    Record<Battery, { status: 'Pending' | 'Confirmed'; lastUpdated: string; confirmedBy?: string }>
+  >(() => {
+    const saved = localStorage.getItem('10med_parade_bty_status_v1');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      'P Bty': { status: 'Pending', lastUpdated: 'Today 06:30' },
+      'Q Bty': { status: 'Pending', lastUpdated: 'Today 06:30' },
+      'R Bty': { status: 'Pending', lastUpdated: 'Today 06:30' },
+      'HQ Bty': { status: 'Pending', lastUpdated: 'Today 06:30' },
+    };
+  });
+
+  const setBatteryParadeStatus = (battery: Battery, status: 'Pending' | 'Confirmed') => {
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const dateStr = `${String(now.getDate()).padStart(2, '0')} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()]}`;
+    const updated = {
+      ...paradeBatteryStatus,
+      [battery]: {
+        status,
+        lastUpdated: `${dateStr} ${timeStr}`,
+        confirmedBy: status === 'Confirmed' ? `${currentUser.rank} ${currentUser.name} (RSM)` : undefined,
+      },
+    };
+    setParadeBatteryStatusState(updated);
+    localStorage.setItem('10med_parade_bty_status_v1', JSON.stringify(updated));
+    showNotification(`${battery} Parade State status set to ${status}`);
+    addAuditLog(
+      'Parade State Status Changed',
+      `${battery} marked as ${status} by ${currentUser.rank} ${currentUser.name}`,
+      'PARADE_STATE'
+    );
+    // Sync to Firestore settings/regiment_settings
+    setDoc(
+      doc(db, 'settings', 'parade_battery_status'),
+      sanitizeForFirestore(updated),
+      { merge: true }
+    ).catch((e) => console.error('Error saving parade battery status to Firestore:', e));
+  };
+
+  // Date-wise & Dynamic Parade State System
+  const [selectedParadeDate, setSelectedParadeDate] = useState<string>(() => {
+    return new Date().toISOString().slice(0, 10);
+  });
+
+  const DEFAULT_PARADE_TYPES: ParadeTypeDefinition[] = [
+    { id: 'Morning', name: 'Morning', order: 1, isActive: true },
+    { id: 'Second Period', name: 'Second Period', order: 2, isActive: true },
+    { id: 'Games', name: 'Games', order: 3, isActive: true },
+    { id: 'Roll Call', name: 'Roll Call', order: 4, isActive: true },
+  ];
+
+  const [paradeTypes, setParadeTypes] = useState<ParadeTypeDefinition[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PARADE_TYPES);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_PARADE_TYPES;
+  });
+
+  const [paradeRecords, setParadeRecords] = useState<Record<string, DateWiseParadeRecord>>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PARADE_RECORDS);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {};
+  });
+
+  const getParadeRecord = (date: string, typeId: string, battery: Battery): DateWiseParadeRecord => {
+    const recordId = `${date}_${typeId}_${battery}`;
+    if (paradeRecords[recordId]) {
+      return paradeRecords[recordId];
+    }
+    // Fallback initialize from live points
+    const initCounts: Record<string, ParadePointCount> = {};
+    dailyParadePoints.forEach((pt) => {
+      initCounts[pt.id] = { ...(pt.counts[battery] || { offr: 0, jco: 0, or: 0 }) };
+    });
+
+    return {
+      id: recordId,
+      date,
+      typeId,
+      battery,
+      status: 'Draft',
+      counts: initCounts,
+      lastUpdated: 'Not submitted',
+    };
+  };
+
+  const saveParadeRecordCounts = (
+    date: string,
+    typeId: string,
+    battery: Battery,
+    counts: Record<string, ParadePointCount>,
+    submitStatus?: ParadeRecordStatus
+  ) => {
+    const recordId = `${date}_${typeId}_${battery}`;
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const isRsm = currentUser.role === 'RSM' || currentUser.role === 'Admin';
+    const existing = getParadeRecord(date, typeId, battery);
+
+    let nextStatus = submitStatus || existing.status;
+    if (isRsm && existing.status !== 'Draft' && existing.status !== 'Finalized') {
+      nextStatus = 'Edited by RSM';
+    }
+
+    const updatedRecord: DateWiseParadeRecord = {
+      ...existing,
+      id: recordId,
+      date,
+      typeId,
+      battery,
+      counts,
+      status: nextStatus,
+      lastUpdated: `${date} ${timeStr}`,
+      updatedBy: `${currentUser.rank} ${currentUser.name} (${currentUser.role})`,
+      editedByRsm: isRsm ? true : existing.editedByRsm,
+      submittedAt: submitStatus === 'Submitted' ? `${date} ${timeStr}` : existing.submittedAt,
+      submittedBy: submitStatus === 'Submitted' ? `${currentUser.rank} ${currentUser.name}` : existing.submittedBy,
+    };
+
+    setParadeRecords((prev) => {
+      const next = { ...prev, [recordId]: updatedRecord };
+      localStorage.setItem(STORAGE_KEYS.PARADE_RECORDS, JSON.stringify(next));
+      return next;
+    });
+
+    // Also sync to Firestore
+    setDoc(
+      doc(db, 'parade_records', recordId),
+      sanitizeForFirestore(updatedRecord),
+      { merge: true }
+    ).catch((e) => console.error('Error saving parade record to Firestore:', e));
+
+    showNotification(`${battery} ${typeId} Parade State saved (${nextStatus}).`);
+    addAuditLog(
+      'Parade State Record Saved',
+      `${battery} ${typeId} on ${date} saved by ${currentUser.rank} ${currentUser.name}`,
+      'PARADE_STATE'
+    );
+  };
+
+  const confirmBatteryParadeRecord = (date: string, typeId: string, battery: Battery) => {
+    const recordId = `${date}_${typeId}_${battery}`;
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const existing = getParadeRecord(date, typeId, battery);
+
+    const isCurrentlyConfirmed = existing.status === 'Confirmed';
+    const newStatus: ParadeRecordStatus = isCurrentlyConfirmed ? 'Pending RSM Confirmation' : 'Confirmed';
+
+    const updatedRecord: DateWiseParadeRecord = {
+      ...existing,
+      status: newStatus,
+      confirmedAt: newStatus === 'Confirmed' ? `${date} ${timeStr}` : undefined,
+      confirmedBy: newStatus === 'Confirmed' ? `${currentUser.rank} ${currentUser.name} (RSM)` : undefined,
+    };
+
+    setParadeRecords((prev) => {
+      const next = { ...prev, [recordId]: updatedRecord };
+      localStorage.setItem(STORAGE_KEYS.PARADE_RECORDS, JSON.stringify(next));
+      return next;
+    });
+
+    setDoc(
+      doc(db, 'parade_records', recordId),
+      sanitizeForFirestore(updatedRecord),
+      { merge: true }
+    ).catch((e) => console.error('Error confirming parade record in Firestore:', e));
+
+    showNotification(`${battery} ${typeId} State ${newStatus === 'Confirmed' ? 'Confirmed by RSM' : 'set to Pending'}.`);
+  };
+
+  const finalizeParadeType = (date: string, typeId: string) => {
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const batteries: Battery[] = ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'];
+    
+    setParadeRecords((prev) => {
+      const next = { ...prev };
+      batteries.forEach((bty) => {
+        const recordId = `${date}_${typeId}_${bty}`;
+        const existing = getParadeRecord(date, typeId, bty);
+        const updated: DateWiseParadeRecord = {
+          ...existing,
+          status: 'Finalized',
+          finalizedAt: `${date} ${timeStr}`,
+          finalizedBy: `${currentUser.rank} ${currentUser.name} (RSM)`,
+        };
+        next[recordId] = updated;
+        setDoc(
+          doc(db, 'parade_records', recordId),
+          sanitizeForFirestore(updated),
+          { merge: true }
+        ).catch((e) => console.error('Error finalizing parade record in Firestore:', e));
+      });
+      localStorage.setItem(STORAGE_KEYS.PARADE_RECORDS, JSON.stringify(next));
+      return next;
+    });
+
+    showNotification(`10 Med Regt ${typeId} Parade State for ${date} has been Finalized!`);
+    addAuditLog(
+      'Parade State Finalized',
+      `${typeId} Parade State on ${date} formally finalized by ${currentUser.rank} ${currentUser.name}`,
+      'PARADE_STATE'
+    );
+  };
+
+  const addParadeType = (name: string, headings?: string[]) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const newType: ParadeTypeDefinition = {
+      id: trimmed,
+      name: trimmed,
+      order: paradeTypes.length + 1,
+      isActive: true,
+      headings,
+      createdAt: new Date().toISOString(),
+      createdBy: `${currentUser.rank} ${currentUser.name}`,
+    };
+
+    const updated = [...paradeTypes, newType];
+    setParadeTypes(updated);
+    localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(updated));
+
+    setDoc(
+      doc(db, 'parade_types', newType.id),
+      sanitizeForFirestore(newType),
+      { merge: true }
+    ).catch((e) => console.error('Error saving parade type in Firestore:', e));
+
+    showNotification(`New Parade State Type "${trimmed}" created successfully.`);
+    addAuditLog(
+      'Parade Type Created',
+      `New Parade State type "${trimmed}" created by RSM`,
+      'PARADE_STATE'
+    );
+  };
 
   // Sync to localStorage for offline cache
   useEffect(() => {
@@ -440,6 +715,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (err) => console.warn('Firestore settings listener warning:', err)
     );
 
+    // 7. /parade_types listener
+    const unsubParadeTypes = onSnapshot(
+      collection(db, 'parade_types'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteTypes = snapshot.docs
+            .map((d) => d.data() as ParadeTypeDefinition)
+            .sort((a, b) => a.order - b.order);
+          setParadeTypes(remoteTypes);
+          localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(remoteTypes));
+        } else {
+          DEFAULT_PARADE_TYPES.forEach((t) => {
+            setDoc(doc(db, 'parade_types', t.id), sanitizeForFirestore(t)).catch((e) =>
+              console.warn('Parade type seed error:', e)
+            );
+          });
+        }
+      },
+      (err) => console.warn('Firestore parade types warning:', err)
+    );
+
+    // 8. /parade_records listener
+    const unsubParadeRecords = onSnapshot(
+      collection(db, 'parade_records'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const map: Record<string, DateWiseParadeRecord> = {};
+          snapshot.docs.forEach((d) => {
+            map[d.id] = d.data() as DateWiseParadeRecord;
+          });
+          setParadeRecords(map);
+          localStorage.setItem(STORAGE_KEYS.PARADE_RECORDS, JSON.stringify(map));
+        }
+      },
+      (err) => console.warn('Firestore parade records warning:', err)
+    );
+
     return () => {
       unsubUsers();
       unsubPersonnel();
@@ -447,6 +759,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubDuty();
       unsubLogs();
       unsubSettings();
+      unsubParadeTypes();
+      unsubParadeRecords();
     };
   }, []);
 
@@ -492,19 +806,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'ভুল ইউজারনেম! এই ইউজারনেমে কোনো অ্যাকাউন্ট পাওয়া যায়নি।' };
     }
 
-    // Default password lookup based on role if not explicitly set
-    const fallbackPassword =
-      user.role === 'CO'
-        ? 'co123'
-        : user.role === 'RSM'
-        ? 'rsm123'
-        : user.role === 'Admin'
-        ? 'admin123'
-        : user.role === 'Offr'
-        ? 'offr123'
-        : 'bsm123';
-
-    const validPassword = user.password || fallbackPassword;
+    // Password verification: Admin default is admin123 if not set; other users require password set
+    let validPassword = user.password;
+    if (!validPassword) {
+      if (user.role === 'Admin' || user.username.toLowerCase() === 'admin') {
+        validPassword = 'admin123';
+      } else {
+        return { success: false, error: 'এই ব্যবহারকারীর জন্য পাসওয়ার্ড এখনও সেট করা হয়নি! অনুগ্রহ করে অ্যাডমিনের সাথে যোগাযোগ করুন।' };
+      }
+    }
 
     if (cleanP !== validPassword) {
       return { success: false, error: 'ভুল পাসওয়ার্ড! অনুগ্রহ করে সঠিক পাসওয়ার্ড প্রদান করুন।' };
@@ -916,15 +1226,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Daily Parade State Management Handlers
   const updateParadePointCount = (pointId: string, battery: Battery, counts: ParadePointCount) => {
     let updatedPt: DailyParadePoint | null = null;
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const isRsmEditor = currentUser.role === 'RSM' || currentUser.role === 'Admin';
+
     setDailyParadePoints((prev) =>
       prev.map((pt) => {
         if (pt.id === pointId) {
+          const nextLocked = { ...(pt.lockedByRsm || {}) };
+          const nextRsmFixedAt = { ...(pt.rsmFixedAt || {}) };
+          if (isRsmEditor) {
+            nextLocked[battery] = true;
+            nextRsmFixedAt[battery] = timeStr;
+          }
+
           updatedPt = {
             ...pt,
             counts: {
               ...pt.counts,
               [battery]: counts,
             },
+            lastUpdated: {
+              ...(pt.lastUpdated || {}),
+              [battery]: timeStr,
+            },
+            lockedByRsm: nextLocked,
+            rsmFixedAt: nextRsmFixedAt,
           };
           return updatedPt;
         }
@@ -1065,6 +1392,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const attached = btyMembers.filter((p) => p.status === 'Attached Out').length;
       const absent = btyMembers.filter((p) => p.status === 'AWOL/OSL').length;
 
+      const btyStatus = paradeBatteryStatus[bty] || { status: 'Pending', lastUpdated: '0630 HRS' };
+
       return {
         battery: bty,
         posted,
@@ -1076,8 +1405,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tempDuty,
         attached,
         absent,
-        submissionStatus: 'Approved',
-        lastUpdated: '0630 HRS',
+        submissionStatus: btyStatus.status === 'Confirmed' ? 'Approved' : 'Pending',
+        lastUpdated: btyStatus.lastUpdated || '0630 HRS',
         submittedBy:
           bty === 'P Bty'
             ? 'SWO Jafor (BSM)'
@@ -1158,6 +1487,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addDailyParadePoint,
         deleteDailyParadePoint,
         toggleDailyParadePointActive,
+        paradeBatteryStatus,
+        setBatteryParadeStatus,
+
+        // Date-wise & Dynamic Parade State System
+        selectedParadeDate,
+        setSelectedParadeDate,
+        paradeTypes,
+        addParadeType,
+        paradeRecords,
+        getParadeRecord,
+        saveParadeRecordCounts,
+        confirmBatteryParadeRecord,
+        finalizeParadeType,
 
         assignOutOfUnit,
         cancelOutOfUnit,

@@ -6,14 +6,10 @@ import {
   Users,
   Building2,
   ClipboardList,
-  ShieldCheck,
-  Eye,
+  Edit3,
   Settings,
-  LogIn,
-  Layers,
   ChevronRight,
   Shield,
-  FileSpreadsheet,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,88 +21,198 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   onCloseMobile,
 }) => {
-  const { activePage, setActivePage, currentUser, personnelList, getRegimentalTotals } = useApp();
+  const {
+    activePage,
+    setActivePage,
+    currentUser,
+    personnelList,
+    getRegimentalTotals,
+    setDailyParadeModalOpen,
+    setSelectedBatteryFilter,
+  } = useApp();
+
   const totals = getRegimentalTotals();
+  const role = currentUser.role;
 
-  const ALL_ROLES: Role[] = ['CO', 'Offr', 'RSM', 'P BSM', 'Q BSM', 'R BSM', 'HQ BSM', 'Admin'];
+  // Build navigation items based on role specifications:
+  // CO & Offr: Main Dashboard, Parade State Dashboard, Regt Nominal
+  // RSM: Main Dashboard, Parade State Dashboard, Regt Nominal, Data Update
+  // BSM (P, Q, R, HQ): Bty Dashboard, Parade State Dashboard, Regt Nominal, Data Update
+  // Admin: All items including Admin Panel
 
-  const navigationItems = [
-    {
-      id: 'main_dashboard',
-      label: 'Main Dashboard',
-      description: 'Regimental Overview & Parade KPIs',
-      icon: LayoutDashboard,
-      badge: `${totals.presentPercentage}%`,
-      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
-      allowedRoles: ALL_ROLES,
-    },
-    {
-      id: 'master_personnel',
-      label: 'Master Personnel Database',
-      description: 'All 10 Med Regt Nominal Roll',
-      icon: Users,
-      badge: `${personnelList.length}`,
-      badgeColor: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-      allowedRoles: ALL_ROLES,
-    },
-    {
+  interface NavItem {
+    id: string;
+    label: string;
+    description: string;
+    icon: React.FC<{ className?: string }>;
+    badge?: string;
+    badgeColor?: string;
+    action?: () => void;
+    hasSubmenu?: boolean;
+  }
+
+  const items: NavItem[] = [];
+
+  const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(role);
+  const isCoOrOffr = role === 'CO' || role === 'Offr';
+  const isRsm = role === 'RSM';
+  const isAdmin = role === 'Admin';
+
+  const [btySubmenuOpen, setBtySubmenuOpen] = React.useState(false);
+
+  if (isBsm) {
+    items.push({
       id: 'battery_dashboard',
-      label: 'Battery Dashboard',
-      description: 'HQ, P, Q, R Battery Sub-units',
+      label: 'Bty Dashboard',
+      description: `${currentUser.assignedBattery || 'Assigned'} Sub-unit`,
       icon: Building2,
-      badge: currentUser.assignedBattery ? currentUser.assignedBattery : '4 Btys',
+      badge: currentUser.assignedBattery || 'Bty',
       badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
-      allowedRoles: ALL_ROLES,
-    },
-    {
+      hasSubmenu: true,
+    });
+    items.push({
       id: 'parade_state',
       label: 'Parade State Dashboard',
       description: 'Morning & Evening Muster Roll',
       icon: ClipboardList,
       badge: 'Live',
       badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
-      allowedRoles: ALL_ROLES,
-    },
-    {
-      id: 'rsm_dashboard',
-      label: 'RSM Consolidated Dashboard',
-      description: 'Regimental Police, Guards & Roster',
-      icon: ShieldCheck,
-      badge: 'RSM',
+    });
+    items.push({
+      id: 'master_personnel',
+      label: 'Regt Nominal',
+      description: 'Battery & Regimental Nominal Roll',
+      icon: Users,
+      badge: `${personnelList.length}`,
+      badgeColor: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+    });
+    items.push({
+      id: 'data_update',
+      label: 'Data Update',
+      description: 'Update Daily Parade & Out of Unit',
+      icon: Edit3,
+      badge: 'Edit',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+      action: () => setDailyParadeModalOpen(true),
+    });
+  } else if (isRsm) {
+    items.push({
+      id: 'main_dashboard',
+      label: 'Main Dashboard',
+      description: 'Regimental Overview & Parade KPIs',
+      icon: LayoutDashboard,
+      badge: `${totals.presentPercentage}%`,
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    });
+    items.push({
+      id: 'parade_state',
+      label: 'Parade State Dashboard',
+      description: 'Morning & Evening Muster Roll',
+      icon: ClipboardList,
+      badge: 'Live',
+      badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+    });
+    items.push({
+      id: 'master_personnel',
+      label: 'Regt Nominal',
+      description: 'All 10 Med Regt Nominal Roll',
+      icon: Users,
+      badge: `${personnelList.length}`,
+      badgeColor: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+    });
+    items.push({
+      id: 'data_update',
+      label: 'Data Update',
+      description: 'RSM Consolidated Entry & Status',
+      icon: Edit3,
+      badge: 'Muster',
       badgeColor: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
-      allowedRoles: ['CO', 'Offr', 'RSM', 'Admin'] as Role[],
-    },
-    {
-      id: 'co_dashboard',
-      label: 'CO Read-only Dashboard',
-      description: 'Executive High-level Strategic State',
-      icon: Eye,
-      badge: 'CO View',
-      badgeColor: 'bg-amber-400/20 text-amber-300 border border-amber-400/30',
-      allowedRoles: ALL_ROLES,
-    },
-    {
+      action: () => setDailyParadeModalOpen(true),
+    });
+  } else if (isCoOrOffr) {
+    items.push({
+      id: 'main_dashboard',
+      label: 'Main Dashboard',
+      description: 'Regimental Overview & Parade KPIs',
+      icon: LayoutDashboard,
+      badge: `${totals.presentPercentage}%`,
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    });
+    items.push({
+      id: 'parade_state',
+      label: 'Parade State Dashboard',
+      description: 'Morning & Evening Muster Roll',
+      icon: ClipboardList,
+      badge: 'Live',
+      badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+    });
+    items.push({
+      id: 'master_personnel',
+      label: 'Regt Nominal',
+      description: 'All 10 Med Regt Nominal Roll',
+      icon: Users,
+      badge: `${personnelList.length}`,
+      badgeColor: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+    });
+  } else {
+    // Admin full access
+    items.push({
+      id: 'main_dashboard',
+      label: 'Main Dashboard',
+      description: 'Regimental Overview & Parade KPIs',
+      icon: LayoutDashboard,
+      badge: `${totals.presentPercentage}%`,
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    });
+    items.push({
+      id: 'battery_dashboard',
+      label: 'Bty Dashboard',
+      description: 'Sub-unit Battery Controls',
+      icon: Building2,
+      badge: '4 Btys',
+      badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+    });
+    items.push({
+      id: 'parade_state',
+      label: 'Parade State Dashboard',
+      description: 'Morning & Evening Muster Roll',
+      icon: ClipboardList,
+      badge: 'Live',
+      badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+    });
+    items.push({
+      id: 'master_personnel',
+      label: 'Regt Nominal',
+      description: 'All 10 Med Regt Nominal Roll',
+      icon: Users,
+      badge: `${personnelList.length}`,
+      badgeColor: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+    });
+    items.push({
+      id: 'data_update',
+      label: 'Data Update',
+      description: 'Update Daily Parade & Out of Unit',
+      icon: Edit3,
+      badge: 'Edit',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+      action: () => setDailyParadeModalOpen(true),
+    });
+    items.push({
       id: 'admin_panel',
       label: 'Admin Panel',
-      description: 'Roles, Battery Assign & Audit Logs',
+      description: 'Roles, Passwords, Users & Audit Logs',
       icon: Settings,
-      badge: 'Config',
-      badgeColor: 'bg-slate-700 text-slate-300 border border-slate-600',
-      allowedRoles: ['Admin', 'CO'] as Role[],
-    },
-    {
-      id: 'login',
-      label: 'Login / Role Switch Page',
-      description: 'Auth & Profile Gateway',
-      icon: LogIn,
-      badge: currentUser.role,
-      badgeColor: 'bg-slate-800 text-slate-400 border border-slate-700',
-      allowedRoles: ALL_ROLES,
-    },
-  ];
+      badge: 'Admin',
+      badgeColor: 'bg-rose-500/20 text-rose-300 border border-rose-500/40',
+    });
+  }
 
-  const handleNavClick = (pageId: string) => {
-    setActivePage(pageId);
+  const handleNavClick = (item: NavItem) => {
+    if (item.action) {
+      item.action();
+    } else {
+      setActivePage(item.id);
+    }
     onCloseMobile();
   };
 
@@ -129,57 +235,93 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center justify-between">
             <span>Command Navigation</span>
-            <span className="text-slate-400">8 Modules</span>
+            <span className="text-slate-400">{currentUser.role} View</span>
           </div>
 
-          {navigationItems.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
-            const isRestricted = !item.allowedRoles.includes(currentUser.role);
 
             return (
-              <button
-                key={item.id}
-                onClick={() => handleNavClick(item.id)}
-                className={`w-full group flex items-center justify-between p-3 rounded-xl text-left transition-all duration-150 ${
-                  isActive
-                    ? 'bg-rose-950/40 text-white border border-rose-500/40 shadow-md shadow-rose-950/30'
-                    : 'text-slate-300 hover:bg-slate-900 hover:text-white border border-transparent'
-                } ${isRestricted ? 'opacity-60' : ''}`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`p-2 rounded-lg flex-shrink-0 transition-colors ${
-                      isActive
-                        ? 'bg-rose-600 text-white'
-                        : 'bg-slate-900 text-slate-400 group-hover:text-rose-400 group-hover:bg-slate-850 border border-slate-800'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="truncate">
-                    <div className="font-semibold text-xs truncate flex items-center gap-1.5">
-                      <span>{item.label}</span>
+              <React.Fragment key={item.id}>
+                <button
+                  onClick={() => {
+                    if (item.hasSubmenu) {
+                      setBtySubmenuOpen(!btySubmenuOpen);
+                    }
+                    handleNavClick(item);
+                  }}
+                  className={`w-full group flex items-center justify-between p-3 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                    isActive
+                      ? 'bg-rose-950/40 text-white border border-rose-500/40 shadow-md shadow-rose-950/30'
+                      : 'text-slate-300 hover:bg-slate-900 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`p-2 rounded-lg flex-shrink-0 transition-colors ${
+                        isActive
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-slate-900 text-slate-400 group-hover:text-rose-400 group-hover:bg-slate-850 border border-slate-800'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate mt-0.5 font-normal">
-                      {item.description}
+                    <div className="truncate">
+                      <div className="font-semibold text-xs truncate flex items-center gap-1.5">
+                        <span>{item.label}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 truncate mt-0.5 font-normal">
+                        {item.description}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                  {item.badge && (
-                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${item.badgeColor}`}>
-                      {item.badge}
-                    </span>
-                  )}
-                  <ChevronRight
-                    className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
-                      isActive ? 'text-rose-400 translate-x-0.5' : 'group-hover:translate-x-0.5'
-                    }`}
-                  />
-                </div>
-              </button>
+                  <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                    {item.badge && (
+                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${item.badgeColor}`}>
+                        {item.badge}
+                      </span>
+                    )}
+                    <ChevronRight
+                      className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                        item.hasSubmenu && btySubmenuOpen ? 'rotate-90 text-rose-400' : isActive ? 'text-rose-400 translate-x-0.5' : 'group-hover:translate-x-0.5'
+                      }`}
+                    />
+                  </div>
+                </button>
+
+                {/* Sub-category for viewing other batteries */}
+                {item.hasSubmenu && btySubmenuOpen && (
+                  <div className="pl-11 pr-2 py-1 space-y-1 bg-slate-950/60 rounded-xl border border-slate-850 my-1 animate-fadeIn">
+                    <div className="text-[10px] text-slate-400 font-mono uppercase px-2 py-0.5 font-bold">
+                      অন্যান্য ব্যাটারি দেখুন:
+                    </div>
+                    {(['P Bty', 'Q Bty', 'R Bty', 'HQ Bty'] as const).map((b) => (
+                      <button
+                        key={b}
+                        onClick={() => {
+                          setSelectedBatteryFilter(b);
+                          setActivePage('battery_dashboard');
+                          onCloseMobile();
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                          currentUser.assignedBattery === b
+                            ? 'text-rose-300 font-bold bg-rose-950/30'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <span>{b}</span>
+                        {currentUser.assignedBattery === b && (
+                          <span className="text-[9px] font-mono px-1 rounded bg-rose-600/30 text-rose-300">
+                            (Nijer)
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </React.Fragment>
             );
           })}
         </div>

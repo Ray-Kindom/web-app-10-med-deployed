@@ -155,79 +155,82 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Role Switcher Dropdown (Essential for testing all requested roles) */}
-            <div className="relative">
-              <button
-                onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-850 hover:to-slate-750 border border-slate-700 text-xs font-medium text-slate-200 shadow-sm"
-              >
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="font-semibold text-amber-300">{currentUser.role}</span>
-                {currentUser.assignedBattery && (
-                  <span className="text-slate-400 font-mono text-[11px] hidden sm:inline">
-                    [{currentUser.assignedBattery}]
-                  </span>
-                )}
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
+            {/* Role Switcher Dropdown - RESTRICTED TO ADMIN ONLY */}
+            {currentUser.role === 'Admin' && (
+              <div className="relative">
+                <button
+                  onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+                  title="Admin Role Simulation"
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-850 hover:to-slate-750 border border-slate-700 text-xs font-medium text-slate-200 shadow-sm"
+                >
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="font-semibold text-amber-300">Simulate: {currentUser.role}</span>
+                  {currentUser.assignedBattery && (
+                    <span className="text-slate-400 font-mono text-[11px] hidden sm:inline">
+                      [{currentUser.assignedBattery}]
+                    </span>
+                  )}
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
 
-              {roleDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-2 z-50 text-slate-200 divide-y divide-slate-800">
-                  <div className="px-3 py-2 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-                    Simulate Unit Role Access:
-                  </div>
+                {roleDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-2 z-50 text-slate-200 divide-y divide-slate-800">
+                    <div className="px-3 py-2 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                      Simulate Unit Role Access (Admin Only):
+                    </div>
 
-                  <div className="py-1">
-                    {rolesList.map((r) => (
+                    <div className="py-1">
+                      {rolesList.map((r) => (
+                        <button
+                          key={r.role}
+                          onClick={() => {
+                            switchRole(r.role, r.bty);
+                            setRoleDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs flex flex-col hover:bg-slate-800 transition-colors ${
+                            currentUser.role === r.role ? 'bg-rose-950/40 border-l-2 border-rose-500 text-white' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-100">{r.label}</span>
+                            {r.bty && (
+                              <span className="text-[10px] font-mono bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
+                                {r.bty}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 mt-0.5">{r.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="p-2">
                       <button
-                        key={r.role}
                         onClick={() => {
-                          switchRole(r.role, r.bty);
+                          logout();
                           setRoleDropdownOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-2 text-xs flex flex-col hover:bg-slate-800 transition-colors ${
-                          currentUser.role === r.role ? 'bg-rose-950/40 border-l-2 border-rose-500 text-white' : ''
-                        }`}
+                        className="w-full text-center px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center gap-1.5 font-medium"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-100">{r.label}</span>
-                          {r.bty && (
-                            <span className="text-[10px] font-mono bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
-                              {r.bty}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-400 mt-0.5">{r.desc}</span>
+                        <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Logout Session</span>
                       </button>
-                    ))}
+                    </div>
                   </div>
-
-                  <div className="p-2">
-                    <button
-                      onClick={() => {
-                        setActivePage('login');
-                        setRoleDropdownOpen(false);
-                      }}
-                      className="w-full text-center px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center gap-1.5 font-medium"
-                    >
-                      <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                      <span>Switch to Login Screen</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Firebase Live Cloud Sync Indicator */}
             <div
               className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs font-mono"
-              title="Real-time Firestore Synchronized to polished-encoder-xqn7r"
+              title="Real-time Firestore Synchronized"
             >
               <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
               <span className="text-[11px] text-emerald-400 font-bold">Cloud Live</span>
             </div>
 
-            {/* Profile Pill */}
+            {/* Profile Pill with User Photo & Name Initials */}
             <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
               {currentUser.avatar || firebaseUser?.photoURL ? (
                 <img
@@ -238,18 +241,33 @@ export const Header: React.FC<HeaderProps> = ({
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center font-bold text-xs text-white shadow-inner font-mono">
-                  {currentUser.rank?.slice(0, 2) || '10'}
+                  {(() => {
+                    const name = currentUser.name || '';
+                    const parts = name.trim().split(/\s+/);
+                    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+                    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                  })()}
                 </div>
               )}
-              <div className="hidden lg:flex flex-col text-left">
-                <span className="text-xs font-bold text-white truncate max-w-[120px]">
-                  {currentUser.name}
+              <div className="hidden sm:flex flex-col text-left">
+                <span className="text-xs font-bold text-white truncate max-w-[130px]">
+                  {currentUser.rank} {currentUser.name}
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono">
-                  {currentUser.snkNo || '10 Med Regt'}
+                  {currentUser.role} {currentUser.assignedBattery ? `[${currentUser.assignedBattery}]` : ''}
                 </span>
               </div>
             </div>
+
+            {/* Universal Logout Button for All Users */}
+            <button
+              onClick={logout}
+              title="লগআউট (Logout Session)"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 text-rose-300 hover:text-white text-xs font-medium transition-all cursor-pointer ml-1 shadow-sm"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden md:inline font-bold">লগআউট</span>
+            </button>
           </div>
         </div>
       </div>
