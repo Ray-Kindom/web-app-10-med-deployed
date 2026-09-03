@@ -1,0 +1,661 @@
+import React, { useState, useMemo } from 'react';
+import { useApp } from '../../context/AppContext';
+import {
+  DailyParadePoint,
+  Battery,
+  ALL_BATTERIES,
+  ParadePointCount,
+} from '../../types';
+import { DEFAULT_PARADE_POINTS } from '../../data/paradePointsData';
+import {
+  X,
+  Plus,
+  Layers,
+  Save,
+  Trash2,
+  CheckCircle2,
+  Sliders,
+  Sparkles,
+  Calculator,
+  Shield,
+  Eye,
+  EyeOff,
+  Filter,
+  Check,
+} from 'lucide-react';
+
+interface DailyParadeStateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  defaultBattery?: Battery;
+}
+
+export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
+  isOpen,
+  onClose,
+  defaultBattery,
+}) => {
+  const {
+    dailyParadePoints,
+    updateParadePointCount,
+    togglePointForBattery,
+    setRsmPointSuggestion,
+    addDailyParadePoint,
+    deleteDailyParadePoint,
+    currentUser,
+    showNotification,
+  } = useApp();
+
+  const isRsmOrAdmin =
+    currentUser.role === 'RSM' ||
+    currentUser.role === 'Admin' ||
+    currentUser.role === 'CO';
+
+  // Active view tab: 'HQ Bty' | 'P Bty' | 'Q Bty' | 'R Bty' | 'Consolidated'
+  const [activeTab, setActiveTab] = useState<Battery | 'Consolidated'>(
+    defaultBattery || (currentUser.assignedBattery as Battery) || 'Consolidated'
+  );
+
+  // RSM Control Panel toggle
+  const [showRsmControls, setShowRsmControls] = useState(false);
+
+  // Add new point state
+  const [newPointName, setNewPointName] = useState('');
+  const [newPointSelectedBtys, setNewPointSelectedBtys] = useState<Battery[]>([
+    'HQ Bty',
+    'P Bty',
+    'Q Bty',
+    'R Bty',
+  ]);
+  const [isAddingNewPoint, setIsAddingNewPoint] = useState(false);
+
+  // Quick edit buffer to allow fluid typing without lagging
+  const [countsBuffer, setCountsBuffer] = useState<
+    Record<string, Record<Battery, ParadePointCount>>
+  >(() => {
+    const buffer: Record<string, Record<Battery, ParadePointCount>> = {};
+    dailyParadePoints.forEach((pt) => {
+      buffer[pt.id] = {
+        'HQ Bty': { ...pt.counts['HQ Bty'] },
+        'P Bty': { ...pt.counts['P Bty'] },
+        'Q Bty': { ...pt.counts['Q Bty'] },
+        'R Bty': { ...pt.counts['R Bty'] },
+      };
+    });
+    return buffer;
+  });
+
+  // Keep buffer in sync when modal opens
+  React.useEffect(() => {
+    const buffer: Record<string, Record<Battery, ParadePointCount>> = {};
+    dailyParadePoints.forEach((pt) => {
+      buffer[pt.id] = {
+        'HQ Bty': { ...pt.counts['HQ Bty'] },
+        'P Bty': { ...pt.counts['P Bty'] },
+        'Q Bty': { ...pt.counts['Q Bty'] },
+        'R Bty': { ...pt.counts['R Bty'] },
+      };
+    });
+    setCountsBuffer(buffer);
+  }, [isOpen, dailyParadePoints]);
+
+  // Points visible for the active tab
+  const visiblePoints = useMemo(() => {
+    return dailyParadePoints.filter((pt) => {
+      if (!pt.isActive) return false;
+      if (activeTab === 'Consolidated') return true;
+      return (
+        !pt.enabledBatteries ||
+        pt.enabledBatteries.includes(activeTab) ||
+        pt.enabledBatteries.length === 0
+      );
+    });
+  }, [dailyParadePoints, activeTab]);
+
+  // Autocomplete suggestions for new point
+  const pointSuggestions = useMemo(() => {
+    if (!newPointName.trim()) return [];
+    const query = newPointName.toLowerCase();
+    const existingNames = dailyParadePoints.map((p) => p.name.toLowerCase());
+    return DEFAULT_PARADE_POINTS.filter(
+      (p) => p.toLowerCase().includes(query) && !existingNames.includes(p.toLowerCase())
+    ).slice(0, 6);
+  }, [newPointName, dailyParadePoints]);
+
+  if (!isOpen) return null;
+
+  const handleCountChange = (
+    pointId: string,
+    bty: Battery,
+    field: 'offr' | 'jco' | 'or',
+    valueStr: string
+  ) => {
+    const val = parseInt(valueStr, 10);
+    const safeVal = isNaN(val) || val < 0 ? 0 : val;
+
+    setCountsBuffer((prev) => {
+      const pointCounts = prev[pointId] || {
+        'HQ Bty': { offr: 0, jco: 0, or: 0 },
+        'P Bty': { offr: 0, jco: 0, or: 0 },
+        'Q Bty': { offr: 0, jco: 0, or: 0 },
+        'R Bty': { offr: 0, jco: 0, or: 0 },
+      };
+
+      const updatedBtyCount = {
+        ...pointCounts[bty],
+        [field]: safeVal,
+      };
+
+      const updated = {
+        ...prev,
+        [pointId]: {
+          ...pointCounts,
+          [bty]: updatedBtyCount,
+        },
+      };
+
+      // Persist to context
+      updateParadePointCount(pointId, bty, updatedBtyCount);
+
+      return updated;
+    });
+  };
+
+  const handleCreatePoint = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPointName.trim()) return;
+
+    addDailyParadePoint(newPointName.trim(), newPointSelectedBtys);
+    setNewPointName('');
+    setIsAddingNewPoint(false);
+  };
+
+  // Grand totals computation
+  const totals = useMemo(() => {
+    let grandOffr = 0;
+    let grandJco = 0;
+    let grandOr = 0;
+
+    visiblePoints.forEach((pt) => {
+      if (activeTab === 'Consolidated') {
+        ALL_BATTERIES.forEach((bty) => {
+          const c = pt.counts[bty] || { offr: 0, jco: 0, or: 0 };
+          grandOffr += c.offr;
+          grandJco += c.jco;
+          grandOr += c.or;
+        });
+      } else {
+        const c = pt.counts[activeTab] || { offr: 0, jco: 0, or: 0 };
+        grandOffr += c.offr;
+        grandJco += c.jco;
+        grandOr += c.or;
+      }
+    });
+
+    return {
+      grandOffr,
+      grandJco,
+      grandOr,
+      grandTotal: grandOffr + grandJco + grandOr,
+    };
+  }, [visiblePoints, activeTab]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+      <div className="relative w-full max-w-6xl bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+        {/* Header */}
+        <div className="px-6 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-white tracking-wide">
+                  Updt Daily Parade State / দৈনিক প্যারেড স্টেট ব্যবস্থাপনা
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-rose-300 border border-rose-500/30">
+                  29 Regimental Duty Points
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Offr, JCO & OR List-Based State Entry with Real-Time Summation & Central RSM Control
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tab Selection & Control Bar */}
+        <div className="px-6 pt-3 pb-2 bg-slate-950/80 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          {/* Battery Tabs */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('Consolidated')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'Consolidated'
+                  ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/30'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Calculator className="w-3.5 h-3.5" />
+              <span>Consolidated 10 Med Roll</span>
+            </button>
+
+            {ALL_BATTERIES.map((bty) => (
+              <button
+                key={bty}
+                onClick={() => setActiveTab(bty)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === bty
+                    ? 'bg-gradient-to-r from-slate-800 to-slate-700 text-white border border-slate-600 shadow-md'
+                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-800'
+                }`}
+              >
+                <span>{bty}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            {isRsmOrAdmin && (
+              <button
+                onClick={() => setShowRsmControls(!showRsmControls)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                  showRsmControls
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                <span>RSM Central Settings & Points</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsAddingNewPoint(!isAddingNewPoint)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-rose-400" />
+              <span>Add Custom Point</span>
+            </button>
+          </div>
+        </div>
+
+        {/* RSM Central Settings Panel */}
+        {showRsmControls && isRsmOrAdmin && (
+          <div className="px-6 py-4 bg-slate-950 border-b border-amber-500/30 space-y-3 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-amber-400" />
+                <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                  RSM Central Configuration & Battery Visibility Controls
+                </h4>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                Regimental Sergeant Major Master Controls
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Select which batteries participate in each duty point. BSMs in unticked batteries will not see that specific point in their daily parade submission sheet.
+            </p>
+
+            <div className="max-h-40 overflow-y-auto pr-2 space-y-1.5 scrollbar-thin">
+              {dailyParadePoints.map((pt) => {
+                const enabled = pt.enabledBatteries || ALL_BATTERIES;
+                return (
+                  <div
+                    key={pt.id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs"
+                  >
+                    <span className="font-semibold text-white">{pt.name}</span>
+                    <div className="flex items-center gap-3">
+                      {ALL_BATTERIES.map((bty) => {
+                        const isChecked = enabled.includes(bty);
+                        return (
+                          <label
+                            key={bty}
+                            className="flex items-center gap-1.5 text-[11px] font-mono text-slate-300 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) =>
+                                togglePointForBattery(pt.id, bty, e.target.checked)
+                              }
+                              className="rounded border-slate-700 bg-slate-950 text-rose-600 focus:ring-rose-500"
+                            />
+                            <span>{bty}</span>
+                          </label>
+                        );
+                      })}
+                      <button
+                        onClick={() => deleteDailyParadePoint(pt.id)}
+                        className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors ml-2"
+                        title="Delete Point"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Add New Custom Point Form */}
+        {isAddingNewPoint && (
+          <form
+            onSubmit={handleCreatePoint}
+            className="px-6 py-4 bg-slate-950 border-b border-rose-500/30 space-y-3 animate-fadeIn"
+          >
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="w-4 h-4" />
+                <span>Create New Duty / Parade Point</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setIsAddingNewPoint(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-300 font-semibold text-xs mb-1">
+                  Point Name * (Autosuggests previous regiment points)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newPointName}
+                  onChange={(e) => setNewPointName(e.target.value)}
+                  placeholder="e.g. Special Guard, VIP Escort, Gun Park"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
+                />
+
+                {/* Suggestions Pills */}
+                {pointSuggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    <span className="text-[10px] text-slate-400 self-center">Suggestions:</span>
+                    {pointSuggestions.map((sug) => (
+                      <button
+                        key={sug}
+                        type="button"
+                        onClick={() => setNewPointName(sug)}
+                        className="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border border-slate-700 font-medium transition-colors"
+                      >
+                        {sug}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold text-xs mb-1">
+                  Enable for Batteries
+                </label>
+                <div className="flex items-center gap-3 pt-2">
+                  {ALL_BATTERIES.map((bty) => {
+                    const checked = newPointSelectedBtys.includes(bty);
+                    return (
+                      <label
+                        key={bty}
+                        className="flex items-center gap-1.5 text-xs text-slate-300 font-mono cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewPointSelectedBtys([...newPointSelectedBtys, bty]);
+                            } else {
+                              setNewPointSelectedBtys(
+                                newPointSelectedBtys.filter((b) => b !== bty)
+                              );
+                            }
+                          }}
+                          className="rounded border-slate-700 bg-slate-900 text-rose-600 focus:ring-rose-500"
+                        />
+                        <span>{bty}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsAddingNewPoint(false)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-900/40 cursor-pointer"
+              >
+                Save Point
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Parade State Table */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-900/90 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                  <th className="py-3 px-3 w-12 text-center">Sl</th>
+                  <th className="py-3 px-4 min-w-[200px]">Duty Point (প্যারেড পয়েন্ট)</th>
+                  {activeTab === 'Consolidated' ? (
+                    <>
+                      <th className="py-3 px-3 text-center bg-slate-950/40">HQ Bty</th>
+                      <th className="py-3 px-3 text-center bg-slate-950/40">P Bty</th>
+                      <th className="py-3 px-3 text-center bg-slate-950/40">Q Bty</th>
+                      <th className="py-3 px-3 text-center bg-slate-950/40">R Bty</th>
+                      <th className="py-3 px-3 text-center font-bold text-rose-400">Total Offr</th>
+                      <th className="py-3 px-3 text-center font-bold text-rose-400">Total JCO</th>
+                      <th className="py-3 px-3 text-center font-bold text-rose-400">Total OR</th>
+                      <th className="py-3 px-4 text-right font-bold text-white bg-slate-900">Total (যোগফল)</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="py-3 px-4 text-center w-28">Offr (অফিসার)</th>
+                      <th className="py-3 px-4 text-center w-28">JCO (জেসিও)</th>
+                      <th className="py-3 px-4 text-center w-28">OR (সৈনিক)</th>
+                      <th className="py-3 px-4 text-right font-bold text-rose-300 w-36 bg-slate-900/60">
+                        Total / যোগফল
+                      </th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {visiblePoints.map((pt, idx) => {
+                  if (activeTab === 'Consolidated') {
+                    const hq = pt.counts['HQ Bty'] || { offr: 0, jco: 0, or: 0 };
+                    const p = pt.counts['P Bty'] || { offr: 0, jco: 0, or: 0 };
+                    const q = pt.counts['Q Bty'] || { offr: 0, jco: 0, or: 0 };
+                    const r = pt.counts['R Bty'] || { offr: 0, jco: 0, or: 0 };
+
+                    const ptTotalOffr = hq.offr + p.offr + q.offr + r.offr;
+                    const ptTotalJco = hq.jco + p.jco + q.jco + r.jco;
+                    const ptTotalOr = hq.or + p.or + q.or + r.or;
+                    const ptGrand = ptTotalOffr + ptTotalJco + ptTotalOr;
+
+                    return (
+                      <tr
+                        key={pt.id}
+                        className="hover:bg-slate-900/60 transition-colors"
+                      >
+                        <td className="py-2.5 px-3 text-center text-slate-500 font-mono">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-4 font-bold text-slate-200">
+                          {pt.name}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
+                          {hq.offr + hq.jco + hq.or}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
+                          {p.offr + p.jco + p.or}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
+                          {q.offr + q.jco + q.or}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
+                          {r.offr + r.jco + r.or}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-300">
+                          {ptTotalOffr}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-300">
+                          {ptTotalJco}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-300">
+                          {ptTotalOr}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-extrabold text-white text-sm bg-slate-900/40">
+                          {ptGrand}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  // Single Battery Edit Row
+                  const currentCounts = pt.counts[activeTab] || { offr: 0, jco: 0, or: 0 };
+                  const rowTotal = currentCounts.offr + currentCounts.jco + currentCounts.or;
+
+                  return (
+                    <tr
+                      key={pt.id}
+                      className="hover:bg-slate-900/60 transition-colors"
+                    >
+                      <td className="py-2.5 px-3 text-center text-slate-500 font-mono">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-4 font-bold text-slate-200">
+                        {pt.name}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={currentCounts.offr}
+                          onChange={(e) =>
+                            handleCountChange(pt.id, activeTab, 'offr', e.target.value)
+                          }
+                          className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-center text-white font-mono font-bold focus:outline-none focus:border-rose-500"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={currentCounts.jco}
+                          onChange={(e) =>
+                            handleCountChange(pt.id, activeTab, 'jco', e.target.value)
+                          }
+                          className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-center text-white font-mono font-bold focus:outline-none focus:border-rose-500"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={currentCounts.or}
+                          onChange={(e) =>
+                            handleCountChange(pt.id, activeTab, 'or', e.target.value)
+                          }
+                          className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-center text-white font-mono font-bold focus:outline-none focus:border-rose-500"
+                        />
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-extrabold text-rose-400 text-sm bg-slate-900/60">
+                        {rowTotal}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-700 bg-slate-950 font-bold text-white text-xs">
+                  <td colSpan={2} className="py-3.5 px-4 text-rose-400 uppercase tracking-wider">
+                    {activeTab === 'Consolidated'
+                      ? 'Regimental Grand Total (সর্বমোট প্যারেড স্টেট)'
+                      : `${activeTab} Total (সর্বমোট)`}
+                  </td>
+                  {activeTab === 'Consolidated' ? (
+                    <>
+                      <td colSpan={4} className="py-3.5 px-3 text-center text-slate-400 font-mono">
+                        4 Batteries Consolidated
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-mono text-white text-sm">
+                        {totals.grandOffr}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-mono text-white text-sm">
+                        {totals.grandJco}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-mono text-white text-sm">
+                        {totals.grandOr}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-mono text-rose-400 font-extrabold text-base bg-rose-500/10">
+                        {totals.grandTotal}
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="py-3.5 px-3 text-center font-mono text-white text-sm">
+                        {totals.grandOffr}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-mono text-white text-sm">
+                        {totals.grandJco}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-mono text-white text-sm">
+                        {totals.grandOr}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-mono text-rose-400 font-extrabold text-base bg-rose-500/10">
+                        {totals.grandTotal}
+                      </td>
+                    </>
+                  )}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>
+              Values auto-saved in live state and synchronized with unit nominal rolls.
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 text-white font-bold transition-all shadow-md cursor-pointer"
+          >
+            Close & Return to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

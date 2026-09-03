@@ -1,0 +1,130 @@
+{
+  "$schema": "https://raw.githubusercontent.com/firebase/firebase-tools/master/schema/blueprint.json",
+  "entities": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "rank": { "type": "string" },
+        "role": { "type": "string", "enum": ["CO", "Offr", "RSM", "P BSM", "Q BSM", "R BSM", "HQ BSM", "Admin"] },
+        "assignedBatteries": { "type": "array", "items": { "type": "string" } },
+        "assignedBattery": { "type": "string" },
+        "email": { "type": "string" },
+        "lastLogin": { "type": "string" },
+        "avatar": { "type": "string" }
+      },
+      "required": ["id", "username", "name", "role"]
+    },
+    "Personnel": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "rk": { "type": "string" },
+        "trade": { "type": "string" },
+        "snkNo": { "type": "string" },
+        "name": { "type": "string" },
+        "battery": { "type": "string", "enum": ["HQ Bty", "P Bty", "Q Bty", "R Bty"] },
+        "status": { "type": "string" },
+        "statusDetails": { "type": "string" },
+        "medicalCat": { "type": "string" },
+        "bloodGrp": { "type": "string" },
+        "dob": { "type": "string" },
+        "doe": { "type": "string" },
+        "svcYears": { "type": "number" },
+        "lveRemaining": { "type": "number" },
+        "mobile": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "address": { "type": "string" },
+        "courses": { "type": "array", "items": { "type": "string" } },
+        "lastFiring": { "type": "string" },
+        "bpfc": { "type": "string" },
+        "photo": { "type": "string" },
+        "remarks": { "type": "string" },
+        "outOfUnitCategory": { "type": "string" },
+        "outOfUnitLocation": { "type": "string" },
+        "outOfUnitStartDate": { "type": "string" },
+        "outOfUnitEndDate": { "type": "string" },
+        "outOfUnitAuthority": { "type": "string" },
+        "outOfUnitRemarks": { "type": "string" }
+      },
+      "required": ["id", "rk", "trade", "snkNo", "name", "battery", "status"]
+    },
+    "DailyParadePoint": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "enabledBatteries": { "type": "array", "items": { "type": "string" } },
+        "counts": { "type": "object" },
+        "rsmSuggested": { "type": "object" }
+      },
+      "required": ["id", "name", "order", "isActive", "counts"]
+    },
+    "DutyAssignment": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "dutyType": { "type": "string" },
+        "assignedPersonnel": { "type": "array" },
+        "status": { "type": "string" },
+        "shift": { "type": "string" },
+        "remarks": { "type": "string" },
+        "location": { "type": "string" }
+      },
+      "required": ["id", "date", "dutyType", "assignedPersonnel", "status"]
+    },
+    "AuditLogItem": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "action": { "type": "string" },
+        "performedBy": { "type": "string" },
+        "role": { "type": "string" },
+        "details": { "type": "string" },
+        "category": { "type": "string", "enum": ["SECURITY", "PERSONNEL", "PARADE_STATE", "SYSTEM"] }
+      },
+      "required": ["id", "timestamp", "action", "performedBy", "details", "category"]
+    },
+    "RegimentSettings": {
+      "type": "object",
+      "properties": {
+        "customLogo": { "type": "string" },
+        "unitName": { "type": "string" },
+        "motto": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Registered system user accounts and roles"
+    },
+    "/personnel/{personnelId}": {
+      "schema": "Personnel",
+      "description": "Regiment soldier master records with strength and parade status"
+    },
+    "/parade_points/{pointId}": {
+      "schema": "DailyParadePoint",
+      "description": "Daily 29 parade line points and battery strength counts"
+    },
+    "/duty_roster/{dutyId}": {
+      "schema": "DutyAssignment",
+      "description": "Operational duties, guards, and roster assignments"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLogItem",
+      "description": "Immutable security and operational compliance audit trail"
+    },
+    "/settings/{settingId}": {
+      "schema": "RegimentSettings",
+      "description": "Unit heraldic emblem and global regiment parameters"
+    }
+  }
+}

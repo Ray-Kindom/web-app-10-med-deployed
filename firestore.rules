@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Role-based helper from stored user profile
+    function getUserRole() {
+      return request.auth.token.role != null 
+        ? request.auth.token.role 
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserRole() == 'Admin' ||
+        request.auth.token.email == '10medclk@gmail.com'
+      );
+    }
+
+    function isCommandStaff() {
+      return isAuthenticated() && (
+        isAdmin() ||
+        getUserRole() in ['CO', 'Offr', 'RSM']
+      );
+    }
+
+    // 1. /users/{userId}
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // 2. /personnel/{personnelId}
+    match /personnel/{personnelId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if true;
+    }
+
+    // 3. /parade_points/{pointId}
+    match /parade_points/{pointId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if true;
+    }
+
+    // 4. /duty_roster/{dutyId}
+    match /duty_roster/{dutyId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if true;
+    }
+
+    // 5. /audit_logs/{logId} - IMMUTABLE SECURITY AUDIT TRAIL
+    // Append-only: creating logs is allowed; editing or deleting logs is strictly forbidden.
+    match /audit_logs/{logId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if false; // IMMUTABLE
+      allow delete: if false; // IMMUTABLE
+    }
+
+    // 6. /settings/{settingId}
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

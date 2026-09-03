@@ -1,0 +1,240 @@
+export type Role =
+  | 'CO'
+  | 'Offr'
+  | 'RSM'
+  | 'P BSM'
+  | 'Q BSM'
+  | 'R BSM'
+  | 'HQ BSM'
+  | 'Admin';
+
+export const OFFICER_RANKS: string[] = ['Lt Col', 'Maj', 'Capt', 'Lt', '2Lt'];
+
+export const isOfficerRank = (rank?: string): boolean => {
+  if (!rank) return false;
+  return OFFICER_RANKS.includes(rank);
+};
+
+export type Battery = 'HQ Bty' | 'P Bty' | 'Q Bty' | 'R Bty';
+
+export const ALL_BATTERIES: Battery[] = ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'];
+
+export type MilitaryRank =
+  | 'Lt Col'
+  | 'Maj'
+  | 'Capt'
+  | 'Lt'
+  | 'MWO'
+  | 'SWO'
+  | 'WO'
+  | 'Sgt'
+  | 'Cpl'
+  | 'Lcpl'
+  | 'Snk';
+
+export const ALL_RANKS: MilitaryRank[] = [
+  'Lt Col',
+  'Maj',
+  'Capt',
+  'Lt',
+  'MWO',
+  'SWO',
+  'WO',
+  'Sgt',
+  'Cpl',
+  'Lcpl',
+  'Snk',
+];
+
+export type Trade =
+  | 'Gnr'
+  | 'TA'
+  | 'OCU'
+  | 'DMT'
+  | 'E&BR'
+  | 'Tailor'
+  | 'Ck(U)'
+  | 'Ck(M)'
+  | 'NC(E)'
+  | 'NC(U)'
+  | '-';
+
+export const ALL_TRADES: Trade[] = [
+  'Gnr',
+  'TA',
+  'OCU',
+  'DMT',
+  'E&BR',
+  'Tailor',
+  'Ck(U)',
+  'Ck(M)',
+  'NC(E)',
+  'NC(U)',
+];
+
+export type OutOfUnitCategory =
+  | 'ERE'
+  | 'Msn'
+  | 'Att'
+  | 'FDMN'
+  | 'CMH'
+  | 'Course'
+  | 'Comd'
+  | 'P/Lve'
+  | 'C/Lve';
+
+export const OUT_OF_UNIT_CATEGORIES: {
+  id: OutOfUnitCategory;
+  label: string;
+  badge: string;
+  description: string;
+}[] = [
+  { id: 'ERE', label: 'ERE', badge: 'Extra Regt', description: 'Extra Regimental Employment (DGFI, BGB, AHQ, Cantonment)' },
+  { id: 'Msn', label: 'Msn', badge: 'UN Mission', description: 'UN Peacekeeping Mission Deployment' },
+  { id: 'Att', label: 'Att', badge: 'Attachment', description: 'Temporary Attachment to other Formations' },
+  { id: 'FDMN', label: 'FDMN', badge: 'Field Duty', description: 'Field Duty & Field Maintenance Outstation' },
+  { id: 'CMH', label: 'CMH', badge: 'Hospital', description: 'Combined Military Hospital (Admission / Review)' },
+  { id: 'Course', label: 'Course', badge: 'Military Cadre', description: 'Cadres & Training Courses (AC&S, SI&T, etc.)' },
+  { id: 'Comd', label: 'Comd', badge: 'Command Task', description: 'Command & Special Formation Duties' },
+  { id: 'P/Lve', label: 'P/Lve', badge: 'Privilege Leave', description: 'Annual Privilege Leave' },
+  { id: 'C/Lve', label: 'C/Lve', badge: 'Casual Leave', description: 'Short Casual Leave / Emergency Leave' },
+];
+
+export type ParadeStatus =
+  | 'Present'
+  | 'On Duty'
+  | 'CMH/Sick'
+  | 'Leave'
+  | 'Course/Trg'
+  | 'Temp Duty'
+  | 'Attached Out'
+  | 'AWOL/OSL';
+
+export interface Personnel {
+  id: string;
+  snkNo: string;
+  batch?: string; // e.g. 88 Recruit Batch, 42 BMA, 2024 Batch
+  rk: MilitaryRank | string;
+  trade: Trade | string;
+  name: string;
+  battery: Battery;
+  status: ParadeStatus;
+  statusDetails?: string;
+  rmk?: string;
+  phone?: string;
+  bloodGroup?: string;
+  enlistmentDate?: string;
+  joiningDate?: string; // Joining Dt in unit
+  enlistmentSource?: 'Posted In from Other Unit' | 'Joined after Training' | 'Re-enlistment' | 'Direct Entry';
+  previousUnit?: string;
+  medicalCategory?: 'AYE' | 'BEE' | 'CEE';
+  currentDuty?: string;
+  nokName?: string;
+  nokContact?: string;
+  // Out of unit category assignment
+  outOfUnitCategory?: OutOfUnitCategory;
+  outOfUnitLocation?: string;
+  outOfUnitStartDate?: string;
+  outOfUnitEndDate?: string;
+  outOfUnitAuthority?: string;
+  outOfUnitRemarks?: string;
+  // Extended state details
+  leaveType?: 'P/Lve' | 'C/Lve';
+  leaveFrom?: string;
+  leaveTo?: string;
+  leaveAddress?: string;
+  courseName?: string;
+  courseLocation?: string;
+  courseFrom?: string;
+  courseTo?: string;
+  courseDuration?: string;
+  sickType?: 'CMH' | 'Sic';
+  hospitalName?: string;
+  diagnosis?: string;
+  admissionDate?: string;
+  reviewDate?: string;
+  comdAssignment?: string;
+  comdLocation?: string;
+  comdFrom?: string;
+  comdTo?: string;
+  comdAuthority?: string;
+}
+
+export interface ParadePointCount {
+  offr: number;
+  jco: number;
+  or: number;
+}
+
+export interface DailyParadePoint {
+  id: string;
+  name: string;
+  order: number;
+  isActive: boolean;
+  enabledBatteries: Battery[]; // Which batteries have this row enabled
+  counts: {
+    'HQ Bty': ParadePointCount;
+    'P Bty': ParadePointCount;
+    'Q Bty': ParadePointCount;
+    'R Bty': ParadePointCount;
+  };
+  rsmSuggested?: Partial<ParadePointCount>;
+}
+
+export interface BatteryParadeSummary {
+  battery: Battery;
+  posted: number;
+  present: number;
+  onDuty: number;
+  sick: number;
+  leave: number;
+  course: number;
+  tempDuty: number;
+  attached: number;
+  absent: number;
+  submissionStatus: 'Pending' | 'Submitted' | 'Verified' | 'Approved';
+  lastUpdated: string;
+  submittedBy?: string;
+}
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  password?: string;
+  name: string;
+  snkNo?: string;
+  rank: string;
+  role: Role;
+  accessLevel?: string;
+  assignedBattery?: Battery;
+  assignedBatteries?: Battery[];
+  email?: string;
+  avatar?: string;
+  lastLogin?: string;
+}
+
+export interface DutyAssignment {
+  id: string;
+  dutyType: 'Quarter Guard' | 'Regimental Police' | 'Duty NCO' | 'Duty Officer' | 'Cookhouse I/C' | 'Armoury Guard' | 'Main Gate';
+  assignedPersonnel: {
+    id: string;
+    snkNo: string;
+    name: string;
+    rank: string;
+    battery: Battery;
+  }[];
+  date: string;
+  shift: 'Day' | 'Night' | '24 Hours';
+  location: string;
+  status: 'Scheduled' | 'Active' | 'Relieved';
+}
+
+export interface AuditLogItem {
+  id: string;
+  timestamp: string;
+  action: string;
+  performedBy: string;
+  role: Role;
+  details: string;
+  category: 'PARADE_STATE' | 'PERSONNEL' | 'SYSTEM' | 'SECURITY';
+}

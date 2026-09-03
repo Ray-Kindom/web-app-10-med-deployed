@@ -1,0 +1,6 @@
+{
+  "name": "10 Med Regt Arty Smart Dashboard",
+  "description": "Secure personnel and Parade State management dashboard for 10 Medium Regiment Artillery",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
