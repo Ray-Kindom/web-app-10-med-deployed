@@ -28,7 +28,7 @@ export const ParadeStatePrintSheet: React.FC<ParadeStatePrintSheetProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
       <div className="relative w-full max-w-4xl bg-white text-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto border border-slate-300 print:border-none print:shadow-none print:w-full print:max-w-none">
         {/* Modal Top Control Bar (Hidden on print) */}
         <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between print:hidden">

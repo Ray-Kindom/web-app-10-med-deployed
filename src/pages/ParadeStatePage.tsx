@@ -11,13 +11,10 @@ import {
   X,
   Plus,
   ClipboardList,
-  Printer,
   CheckCircle2,
   AlertTriangle,
   Send,
   ShieldCheck,
-  Clock,
-  Download,
   Users,
   Layers,
   PlaneTakeoff,
@@ -86,81 +83,24 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner with Date Selector */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 shadow-xl space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                10 Med Regt Parade State Console
-              </span>
-              <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                DATE-WISE HISTORICAL RECORD
-              </span>
-            </div>
-
-            <h1 className="text-2xl font-bold text-white tracking-tight font-sans mt-1">
-              {isBsm ? `${assignedBty} Parade State Dashboard` : 'Regimental Parade State Command'}
-            </h1>
-            <p className="text-xs text-slate-400 font-mono">
-              Morning, Second Period, Games & Roll Call with Battery-wise & RSM confirmation workflow.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Date Selector */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700/80">
-              <Clock className="w-4 h-4 text-rose-400" />
-              <span className="text-xs text-slate-400 font-mono">Date:</span>
-              <input
-                type="date"
-                value={selectedParadeDate}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedParadeDate(e.target.value);
-                    showNotification(`Date changed to ${e.target.value}`);
-                  }
-                }}
-                className="bg-transparent text-white font-mono font-bold text-xs focus:outline-none cursor-pointer"
-              />
-            </div>
-
-            {/* RSM-Only Add New Parade State Type */}
-            {isRsm && (
-              <button
-                onClick={() => setIsAddTypeModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-950/40 transition-colors cursor-pointer"
-              >
-                <span>+ Add Parade Type</span>
-              </button>
-            )}
-
-            <button
-              onClick={onOpenPrintModal}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4 text-emerald-400" />
-              <span>Download State</span>
-            </button>
-
-            <button
-              onClick={onOpenPrintModal}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950/40 transition-colors cursor-pointer"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Print State</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* 4 PRIMARY PARADE STATE TYPE BOXES/CARDS (Morning, Second Period, Games, Roll Call + Dynamic) */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
           <span className="font-bold text-white uppercase tracking-wider">
-            Daily Muster Types for {selectedParadeDate}:
+            Daily Muster Types:
           </span>
-          <span>Click any card below to open & review record</span>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-slate-400">Click any session card to open sheet, view date, print & download</span>
+            {isRsm && (
+              <button
+                onClick={() => setIsAddTypeModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Parade Type</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -320,6 +260,7 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
           sessionType={activeModalSession}
           date={selectedParadeDate}
           defaultBattery={isBsm ? assignedBty : undefined}
+          onOpenPrintModal={onOpenPrintModal}
         />
       )}
 
