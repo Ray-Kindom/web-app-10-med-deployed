@@ -60,15 +60,18 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
     'AWOL/OSL',
   ];
 
-  // Specific Rank Filter Options as requested: Offr, JCO, Sgt, Cpl, Lcpl, Snk
+  // Rank Filter Options
   const rankFilterOptions = [
     { value: 'All', label: 'All Ranks' },
-    { value: 'Offr', label: 'Offr' },
-    { value: 'JCO', label: 'JCO' },
+    { value: 'Offr', label: 'Offr (Officers)' },
+    { value: 'JCO', label: 'JCO (Junior Commissioned)' },
+    { value: 'OR', label: 'OR (Other Ranks)' },
+    { value: 'Civilian', label: 'Civilian' },
+    { value: 'RCO', label: 'RCO' },
     { value: 'Sgt', label: 'Sgt' },
     { value: 'Cpl', label: 'Cpl' },
     { value: 'Lcpl', label: 'Lcpl' },
-    { value: 'Snk', label: 'Snk' },
+    { value: 'Snk', label: 'Snk / Gnr' },
   ];
 
   // Trade Filter Options (Short forms only)
@@ -131,6 +134,13 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
         } else if (selectedRank === 'JCO') {
           const jcoRanks = ['SWO', 'WO', 'MWO'];
           if (!jcoRanks.includes(person.rk)) return false;
+        } else if (selectedRank === 'OR') {
+          const orRanks = ['Sgt', 'Cpl', 'Lcpl', 'Snk', 'Gnr', 'SNK DMT)'];
+          if (!orRanks.includes(person.rk)) return false;
+        } else if (selectedRank === 'Civilian') {
+          if (person.rk !== 'Civilian' && person.rk !== 'NC(E)' && person.rk !== 'NC(U)' && person.trade !== 'Civilian' && person.trade !== 'NC(E)') return false;
+        } else if (selectedRank === 'RCO') {
+          if (person.rk !== 'RCO' && person.trade !== 'RCO') return false;
         } else if (selectedRank === 'Snk') {
           // Snk includes Gnr / Snk
           if (person.rk !== 'Snk' && person.rk !== 'Gnr') return false;
@@ -226,9 +236,6 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
                 {filteredPersonnel.length} / {personnel.length}
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-medium">
-              Real-time nominal roll, rank & trade classification, parade state and medical records
-            </p>
           </div>
 
           {/* Action Controls: Download Nominal, Enlist Soldier, Reset */}
@@ -426,9 +433,6 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
                   <div className="max-w-xs mx-auto space-y-2">
                     <Filter className="w-8 h-8 text-slate-600 mx-auto" />
                     <p className="font-semibold text-slate-300">No personnel match current criteria</p>
-                    <p className="text-[11px] text-slate-400">
-                      Try adjusting the search query, rank, trade, or status filters.
-                    </p>
                     <button
                       onClick={handleResetFilters}
                       className="mt-2 px-3 py-1.5 rounded-lg bg-rose-600 text-white font-semibold text-xs inline-block"

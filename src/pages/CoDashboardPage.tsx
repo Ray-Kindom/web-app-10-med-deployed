@@ -55,9 +55,6 @@ export const CoDashboardPage: React.FC<CoDashboardPageProps> = ({
             <h1 className="text-2xl font-black text-white tracking-tight font-serif">
               State of the Regiment — Executive Summary
             </h1>
-            <p className="text-xs text-slate-400 font-sans">
-              10 Medium Regiment Artillery • Combat Readiness & Troop Availability
-            </p>
           </div>
 
           <div className="flex items-center gap-3">

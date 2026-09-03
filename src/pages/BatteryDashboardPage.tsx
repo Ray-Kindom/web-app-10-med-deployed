@@ -5,16 +5,13 @@ import { StatCard } from '../components/common/StatCard';
 import { PersonnelTable } from '../components/personnel/PersonnelTable';
 import { ParadeActionControls } from '../components/parade/ParadeActionControls';
 import {
-  Building2,
   Users,
   CheckCircle2,
   ShieldAlert,
   HeartPulse,
   PlaneTakeoff,
   Send,
-  Sparkles,
   Radio,
-  Printer,
   X,
 } from 'lucide-react';
 
@@ -87,8 +84,6 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
     },
   ];
 
-  const currentBtyInfo = batteries.find((b) => b.id === activeBattery) || batteries[0];
-
   const btyPersonnel = personnelList.filter((p) => p.battery === activeBattery);
   const postedCount = btyPersonnel.length;
   const presentCount = btyPersonnel.filter((p) => p.status === 'Present').length;
@@ -96,9 +91,6 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
   const sickCount = btyPersonnel.filter((p) => p.status === 'CMH/Sick').length;
   const leaveCount = btyPersonnel.filter((p) => p.status === 'Leave').length;
   const courseCount = btyPersonnel.filter((p) => p.status === 'Course/Trg' || p.status === 'Temp Duty').length;
-
-  const effectivePresent = presentCount + dutyCount;
-  const readinessPct = postedCount > 0 ? Math.round((effectivePresent / postedCount) * 100) : 0;
 
   const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
   const isBsmRestricted = isBsm && currentUser.assignedBattery && currentUser.assignedBattery !== activeBattery;
@@ -122,51 +114,45 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
     : [];
 
   return (
-    <div className="space-y-6">
-      {/* Battery Selector Tabs - Only shown for Admin, CO, RSM. For BSM, shows their battery badge */}
-      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
-        {!isBsm ? (
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-950 border border-slate-800">
-            {batteries.map((b) => {
-              const isSelected = activeBattery === b.id;
-              const isAssigned = currentUser.assignedBattery === b.id;
+    <div className="space-y-5">
+      {/* Battery Header: ONLY Battery Name (e.g. "P Bty" or user's respective battery name) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-sans">
+            {activeBattery}
+          </h1>
 
-              return (
-                <button
-                  key={b.id}
-                  onClick={() => {
-                    setActiveBattery(b.id);
-                    setSelectedBatteryFilter(b.id);
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-xs transition-all whitespace-nowrap cursor-pointer ${
-                    isSelected
-                      ? 'bg-rose-600 text-white font-bold shadow-lg shadow-rose-950/50'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                  }`}
-                >
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span>{b.id}</span>
-                  {isAssigned && (
-                    <span className="text-[9px] font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">
-                      Assigned
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono">
-            <Building2 className="w-4 h-4 text-rose-500" />
-            <span className="font-bold text-white">{activeBattery}</span>
-            <span className="text-slate-400 text-[11px]">(আপনার দায়িত্বপ্রাপ্ত ব্যাটারি)</span>
-          </div>
-        )}
+          {/* Sub-unit battery selector for privileged users (Admin, CO, RSM, Offr) */}
+          {!isBsm && (
+            <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 p-1 rounded-xl">
+              {batteries.map((b) => {
+                const isSelected = activeBattery === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => {
+                      setActiveBattery(b.id);
+                      setSelectedBatteryFilter(b.id);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-rose-600 text-white shadow-md shadow-rose-950/40 font-bold'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                    }`}
+                  >
+                    {b.id}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
+        {/* Right action controls: BSM Morning Roll submission if eligible */}
         {isBsm && !isBsmRestricted && (
           <button
             onClick={handleSubmitMorningRoll}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/40 transition-colors whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-950/40 transition-colors whitespace-nowrap cursor-pointer self-start sm:self-auto"
           >
             <Send className="w-3.5 h-3.5" />
             <span>Submit {activeBattery} Morning Roll</span>
@@ -174,114 +160,50 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
         )}
       </div>
 
-      {/* Battery Header Overview */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 shadow-xl space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                10 Med Regt Sub-Unit
-              </span>
-              <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">
-                PARADE STATE VERIFIED
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight font-sans mt-1">
-              {currentBtyInfo.name}
-            </h1>
-            <p className="text-xs text-slate-400 font-mono mt-0.5">{currentBtyInfo.role}</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-4 text-xs font-mono bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
-              <div>
-                <div className="text-[10px] text-slate-400">Battery Commander (BC):</div>
-                <div className="font-bold text-slate-200">{currentBtyInfo.commander}</div>
-              </div>
-              <div className="border-l border-slate-800 pl-4">
-                <div className="text-[10px] text-slate-400">Battery Sgt Major (BSM):</div>
-                <div className="font-bold text-rose-400">{currentBtyInfo.bsm}</div>
-              </div>
-            </div>
-
-            {onOpenPrintModal && (
-              <button
-                onClick={onOpenPrintModal}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors whitespace-nowrap self-stretch sm:self-auto cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5 text-rose-400" />
-                <span>Print State</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Readiness Meter */}
-        <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="text-slate-300 flex items-center gap-1.5 font-mono">
-              <Sparkles className="w-3.5 h-3.5 text-rose-400" />
-              <span>Battery Combat & Manning State</span>
-            </span>
-            <span className="font-mono text-emerald-400 font-bold">
-              {readinessPct}% Effective ({effectivePresent}/{postedCount})
-            </span>
-          </div>
-          <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-              style={{ width: `${readinessPct}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Battery Clickable Stat Cards - cleaned up without hint text */}
-      <div className="space-y-1.5">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatCard
-            title="Posted in Bty"
-            value={postedCount}
-            icon={Users}
-            colorScheme="slate"
-            onClick={() => setSelectedStatFilter({ title: `${activeBattery} Posted Strength`, status: 'All' })}
-          />
-          <StatCard
-            title="Present On Parade"
-            value={presentCount}
-            icon={CheckCircle2}
-            colorScheme="emerald"
-            onClick={() => setSelectedStatFilter({ title: `${activeBattery} Present on Parade`, status: 'Present' })}
-          />
-          <StatCard
-            title="On Guard / Duty"
-            value={dutyCount}
-            icon={ShieldAlert}
-            colorScheme="blue"
-            onClick={() => setSelectedStatFilter({ title: `${activeBattery} On Duty Troops`, status: 'On Duty' })}
-          />
-          <StatCard
-            title="CMH / Sick"
-            value={sickCount}
-            icon={HeartPulse}
-            colorScheme="amber"
-            onClick={() => setSelectedStatFilter({ title: `${activeBattery} CMH / Sick Personnel`, status: 'CMH/Sick' })}
-          />
-          <StatCard
-            title="On Leave"
-            value={leaveCount}
-            icon={PlaneTakeoff}
-            colorScheme="purple"
-            onClick={() => setSelectedStatFilter({ title: `${activeBattery} Troops on Leave`, status: 'Leave' })}
-          />
-          <StatCard
-            title="Course / TD"
-            value={courseCount}
-            icon={Radio}
-            colorScheme="cyan"
-            onClick={() => setSelectedStatFilter({ title: `${activeBattery} Course / Temp Duty Personnel`, status: 'Course/Trg' })}
-          />
-        </div>
+      {/* Battery Stat Cards - adjusted with beautiful layout, clean spacing, and high contrast */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <StatCard
+          title="Posted in Bty"
+          value={postedCount}
+          icon={Users}
+          colorScheme="slate"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Posted Strength`, status: 'All' })}
+        />
+        <StatCard
+          title="Present On Parade"
+          value={presentCount}
+          icon={CheckCircle2}
+          colorScheme="emerald"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Present on Parade`, status: 'Present' })}
+        />
+        <StatCard
+          title="On Guard / Duty"
+          value={dutyCount}
+          icon={ShieldAlert}
+          colorScheme="blue"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} On Duty Troops`, status: 'On Duty' })}
+        />
+        <StatCard
+          title="CMH / Sick"
+          value={sickCount}
+          icon={HeartPulse}
+          colorScheme="amber"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} CMH / Sick Personnel`, status: 'CMH/Sick' })}
+        />
+        <StatCard
+          title="On Leave"
+          value={leaveCount}
+          icon={PlaneTakeoff}
+          colorScheme="purple"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Troops on Leave`, status: 'Leave' })}
+        />
+        <StatCard
+          title="Course / TD"
+          value={courseCount}
+          icon={Radio}
+          colorScheme="cyan"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Course / Temp Duty Personnel`, status: 'Course/Trg' })}
+        />
       </div>
 
       {/* Updt Daily Parade State & Updt Out Of Unit Action Control Boxes */}

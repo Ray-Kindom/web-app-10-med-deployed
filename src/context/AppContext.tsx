@@ -14,6 +14,13 @@ import {
   ParadeTypeDefinition,
   DateWiseParadeRecord,
   ParadeRecordStatus,
+  SystemCategory,
+  SubCategoryItem,
+  SubUnitConfig,
+  RankConfig,
+  AuthEstablishmentItem,
+  CalculationConfig,
+  RankCategory,
 } from '../types';
 import {
   INITIAL_PERSONNEL,
@@ -22,6 +29,13 @@ import {
   INITIAL_AUDIT_LOGS,
 } from '../data/initialData';
 import { INITIAL_PARADE_POINTS } from '../data/paradePointsData';
+import {
+  INITIAL_SYSTEM_CATEGORIES,
+  INITIAL_SUB_UNITS,
+  INITIAL_RANKS,
+  INITIAL_AUTH_ESTABLISHMENT,
+  INITIAL_CALCULATION_CONFIG,
+} from '../data/configData';
 import {
   db,
   auth,
@@ -40,6 +54,8 @@ interface AppContextType {
   currentUser: UserAccount;
   setCurrentUser: (user: UserAccount) => void;
   switchRole: (role: Role, battery?: Battery) => void;
+  isAdmin: boolean;
+  isRSM: boolean;
   usersList: UserAccount[];
   addUser: (user: Omit<UserAccount, 'id'>) => void;
   updateUser: (id: string, updated: Partial<UserAccount>) => void;
@@ -79,6 +95,38 @@ interface AppContextType {
   notification: string | null;
   showNotification: (msg: string) => void;
 
+  // Dynamic Categories & Sub-Categories (ADMIN FULL CONTROL)
+  categoriesList: SystemCategory[];
+  addCategory: (cat: Omit<SystemCategory, 'id'>) => boolean;
+  updateCategory: (id: string, updated: Partial<SystemCategory>) => boolean;
+  deleteCategory: (id: string) => boolean;
+  addSubCategory: (categoryId: string, subCat: Omit<SubCategoryItem, 'id'>) => boolean;
+  updateSubCategory: (categoryId: string, subCatId: string, updated: Partial<SubCategoryItem>) => boolean;
+  deleteSubCategory: (categoryId: string, subCatId: string) => boolean;
+  reorderCategories: (orderedIds: string[]) => boolean;
+
+  // Sub Units Configuration (ADMIN FULL CONTROL)
+  subUnitsList: SubUnitConfig[];
+  addSubUnit: (unit: Omit<SubUnitConfig, 'id'>) => boolean;
+  updateSubUnit: (id: string, updated: Partial<SubUnitConfig>) => boolean;
+  deleteSubUnit: (id: string) => boolean;
+
+  // Military Ranks Configuration (ADMIN FULL CONTROL)
+  ranksList: RankConfig[];
+  addRank: (rank: Omit<RankConfig, 'id'>) => boolean;
+  updateRank: (id: string, updated: Partial<RankConfig>) => boolean;
+  deleteRank: (id: string) => boolean;
+
+  // AUTH / Authorized Establishment (ADMIN STRICT CONTROL ONLY)
+  authEstablishmentList: AuthEstablishmentItem[];
+  updateAuthEstablishment: (id: string, updated: Partial<AuthEstablishmentItem>) => boolean;
+  addAuthEstablishmentItem: (item: Omit<AuthEstablishmentItem, 'id'>) => boolean;
+  deleteAuthEstablishmentItem: (id: string) => boolean;
+
+  // Calculation Engine Configuration (ADMIN FULL CONTROL)
+  calculationConfig: CalculationConfig;
+  updateCalculationConfig: (updated: Partial<CalculationConfig>) => boolean;
+
   // Daily Parade State Management
   dailyParadePoints: DailyParadePoint[];
   updateParadePointCount: (pointId: string, battery: Battery, counts: ParadePointCount) => void;
@@ -94,6 +142,8 @@ interface AppContextType {
   setSelectedParadeDate: (date: string) => void;
   paradeTypes: ParadeTypeDefinition[];
   addParadeType: (name: string, headings?: string[]) => void;
+  updateParadeType: (id: string, updated: Partial<ParadeTypeDefinition>) => boolean;
+  deleteParadeType: (id: string) => boolean;
   paradeRecords: Record<string, DateWiseParadeRecord>; // key: [date]_[typeId]_[battery]
   getParadeRecord: (date: string, typeId: string, battery: Battery) => DateWiseParadeRecord;
   saveParadeRecordCounts: (
@@ -154,6 +204,11 @@ const STORAGE_KEYS = {
   PARADE_RECORDS: '10med_parade_records_v1',
   AUTH_STATUS: '10med_auth_status_v2',
   ACTIVE_PAGE: '10med_active_page_v2',
+  SYSTEM_CATEGORIES: '10med_system_categories_v1',
+  SUB_UNITS: '10med_sub_units_v1',
+  MILITARY_RANKS: '10med_military_ranks_v1',
+  AUTH_ESTABLISHMENT: '10med_auth_establishment_v1',
+  CALCULATION_CONFIG: '10med_calc_config_v1',
 };
 
 // Helper to strip undefined values so Firestore does not throw serialization error
@@ -199,6 +254,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return INITIAL_USERS[0]; // Default to CO
   });
+
+  // Dynamic Categories & Sub-Categories (Database-Driven, controlled by Admin)
+  const [categoriesList, setCategoriesList] = useState<SystemCategory[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.SYSTEM_CATEGORIES);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return INITIAL_SYSTEM_CATEGORIES;
+  });
+
+  // Sub Units & Batteries Configuration
+  const [subUnitsList, setSubUnitsList] = useState<SubUnitConfig[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.SUB_UNITS);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return INITIAL_SUB_UNITS;
+  });
+
+  // Military Ranks Configuration
+  const [ranksList, setRanksList] = useState<RankConfig[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.MILITARY_RANKS);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return INITIAL_RANKS;
+  });
+
+  // Authorized Establishment (AUTH) - Strictly Admin
+  const [authEstablishmentList, setAuthEstablishmentList] = useState<AuthEstablishmentItem[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AUTH_ESTABLISHMENT);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return INITIAL_AUTH_ESTABLISHMENT;
+  });
+
+  // Calculation Engine Configuration (Total Out, Off Parade, On Parade Rules)
+  const [calculationConfig, setCalculationConfig] = useState<CalculationConfig>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CALCULATION_CONFIG);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return INITIAL_CALCULATION_CONFIG;
+  });
+
+  // Role permissions
+  const isAdmin = currentUser.role === 'Admin' || currentUser.email === '10medclk@gmail.com';
+  const isRSM = currentUser.role === 'RSM';
+
 
   const [personnelList, setPersonnelList] = useState<Personnel[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PERSONNEL);
@@ -504,6 +619,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addParadeType = (name: string, headings?: string[]) => {
+    if (!isAdmin) {
+      showNotification('Permission Denied: Only ADMIN has permission to create new Parade State types.');
+      addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (${currentUser.role}) attempted to create parade type`, 'SECURITY');
+      return;
+    }
     const trimmed = name.trim();
     if (!trimmed) return;
     const newType: ParadeTypeDefinition = {
@@ -513,26 +633,384 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isActive: true,
       headings,
       createdAt: new Date().toISOString(),
-      createdBy: `${currentUser.rank} ${currentUser.name}`,
+      createdBy: `${currentUser.rank} ${currentUser.name} (ADMIN)`,
     };
 
     const updated = [...paradeTypes, newType];
     setParadeTypes(updated);
     localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(updated));
 
-    setDoc(
-      doc(db, 'parade_types', newType.id),
-      sanitizeForFirestore(newType),
-      { merge: true }
-    ).catch((e) => console.error('Error saving parade type in Firestore:', e));
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_types', newType.id),
+        sanitizeForFirestore(newType),
+        { merge: true }
+      ),
+      'save parade type'
+    );
 
-    showNotification(`New Parade State Type "${trimmed}" created successfully.`);
+    showNotification(`New Parade State Type "${trimmed}" created by ADMIN.`);
     addAuditLog(
       'Parade Type Created',
-      `New Parade State type "${trimmed}" created by RSM`,
+      `New Parade State type "${trimmed}" created by ADMIN`,
       'PARADE_STATE'
     );
   };
+
+  // Safe helper to sync to Firestore without throwing noisy unhandled console exceptions when in local/offline mode
+  const syncDoc = (promiseOrFn: (() => Promise<any>) | Promise<any>, description?: string) => {
+    if (!auth.currentUser) return;
+    const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
+    p.catch((err: any) => {
+      console.warn(`[Firestore sync notice - ${description || 'operation'}]:`, err?.message || err);
+    });
+  };
+
+  const updateParadeType = (id: string, updated: Partial<ParadeTypeDefinition>): boolean => {
+    if (!isAdmin) {
+      showNotification('Permission Denied: Only ADMIN has permission to modify Parade State types.');
+      addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (${currentUser.role}) attempted to edit parade type`, 'SECURITY');
+      return false;
+    }
+    const next = paradeTypes.map((t) => (t.id === id ? { ...t, ...updated } : t));
+    setParadeTypes(next);
+    localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'parade_types', id), sanitizeForFirestore(updated), { merge: true }), 'update parade type');
+    showNotification(`Parade State "${id}" updated by ADMIN.`);
+    addAuditLog('Parade Type Updated', `Parade State "${id}" updated by ADMIN`, 'PARADE_STATE');
+    return true;
+  };
+
+  const deleteParadeType = (id: string): boolean => {
+    if (!isAdmin) {
+      showNotification('Permission Denied: Only ADMIN has permission to delete Parade State types.');
+      addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (${currentUser.role}) attempted to delete parade type`, 'SECURITY');
+      return false;
+    }
+    const next = paradeTypes.filter((t) => t.id !== id);
+    setParadeTypes(next);
+    localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(next));
+    syncDoc(deleteDoc(doc(db, 'parade_types', id)), 'delete parade type');
+    showNotification(`Parade State "${id}" deleted by ADMIN.`);
+    addAuditLog('Parade Type Deleted', `Parade State "${id}" deleted by ADMIN`, 'PARADE_STATE');
+    return true;
+  };
+
+  // 1. Dynamic Categories & Sub-Categories (ADMIN FULL CONTROL)
+  const addCategory = (cat: Omit<SystemCategory, 'id'>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to add categories.');
+      addAuditLog('Unauthorized Category Attempt', `${currentUser.name} (${currentUser.role}) attempted to create category ${cat.name}`, 'SECURITY');
+      return false;
+    }
+    const newId = 'cat-' + Date.now();
+    const newCat: SystemCategory = {
+      ...cat,
+      id: newId,
+      order: cat.order ?? (categoriesList.length + 1),
+      subCategories: cat.subCategories || [],
+    };
+    const updated = [...categoriesList, newCat];
+    setCategoriesList(updated);
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_CATEGORIES, JSON.stringify(updated));
+    syncDoc(setDoc(doc(db, 'system_categories', newId), sanitizeForFirestore(newCat)), 'add category');
+    showNotification(`Main Category "${newCat.name}" created successfully by ADMIN.`);
+    addAuditLog('Category Created', `ADMIN created category ${newCat.name}`, 'SYSTEM');
+    return true;
+  };
+
+  const updateCategory = (id: string, updated: Partial<SystemCategory>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to edit categories.');
+      addAuditLog('Unauthorized Category Attempt', `${currentUser.name} (${currentUser.role}) attempted to edit category ${id}`, 'SECURITY');
+      return false;
+    }
+    const next = categoriesList.map((c) => (c.id === id ? { ...c, ...updated } : c));
+    setCategoriesList(next);
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_CATEGORIES, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'system_categories', id), sanitizeForFirestore(updated), { merge: true }), 'update category');
+    showNotification(`Category updated successfully by ADMIN.`);
+    addAuditLog('Category Updated', `ADMIN updated category ${id}`, 'SYSTEM');
+    return true;
+  };
+
+  const deleteCategory = (id: string): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to delete categories.');
+      addAuditLog('Unauthorized Category Attempt', `${currentUser.name} (${currentUser.role}) attempted to delete category ${id}`, 'SECURITY');
+      return false;
+    }
+    const target = categoriesList.find((c) => c.id === id);
+    const next = categoriesList.filter((c) => c.id !== id);
+    setCategoriesList(next);
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_CATEGORIES, JSON.stringify(next));
+    syncDoc(deleteDoc(doc(db, 'system_categories', id)), 'delete category');
+    showNotification(`Category "${target?.name || id}" deleted by ADMIN.`);
+    addAuditLog('Category Deleted', `ADMIN deleted category ${target?.name || id}`, 'SYSTEM');
+    return true;
+  };
+
+  const addSubCategory = (categoryId: string, subCat: Omit<SubCategoryItem, 'id'>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to add sub-categories.');
+      addAuditLog('Unauthorized Sub-category Attempt', `${currentUser.name} (${currentUser.role}) attempted to add sub-category ${subCat.name}`, 'SECURITY');
+      return false;
+    }
+    const subId = 'sub-' + Date.now();
+    const newSub: SubCategoryItem = {
+      ...subCat,
+      id: subId,
+      order: subCat.order ?? 99,
+    };
+    const next = categoriesList.map((c) => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          subCategories: [...c.subCategories, newSub],
+        };
+      }
+      return c;
+    });
+    setCategoriesList(next);
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_CATEGORIES, JSON.stringify(next));
+    const targetCat = next.find((c) => c.id === categoryId);
+    if (targetCat) {
+      syncDoc(setDoc(doc(db, 'system_categories', categoryId), sanitizeForFirestore(targetCat), { merge: true }), 'add sub category');
+    }
+    showNotification(`Sub-category "${newSub.name}" added to ${targetCat?.name} by ADMIN.`);
+    addAuditLog('Sub-Category Added', `ADMIN added sub-category ${newSub.name} to ${targetCat?.name}`, 'SYSTEM');
+    return true;
+  };
+
+  const updateSubCategory = (categoryId: string, subCatId: string, updated: Partial<SubCategoryItem>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to edit sub-categories.');
+      addAuditLog('Unauthorized Sub-category Attempt', `${currentUser.name} (${currentUser.role}) attempted to edit sub-category ${subCatId}`, 'SECURITY');
+      return false;
+    }
+    const next = categoriesList.map((c) => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          subCategories: c.subCategories.map((s) => (s.id === subCatId ? { ...s, ...updated } : s)),
+        };
+      }
+      return c;
+    });
+    setCategoriesList(next);
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_CATEGORIES, JSON.stringify(next));
+    const targetCat = next.find((c) => c.id === categoryId);
+    if (targetCat) {
+      syncDoc(setDoc(doc(db, 'system_categories', categoryId), sanitizeForFirestore(targetCat), { merge: true }), 'update sub category');
+    }
+    showNotification(`Sub-category updated by ADMIN.`);
+    addAuditLog('Sub-Category Updated', `ADMIN updated sub-category ${subCatId}`, 'SYSTEM');
+    return true;
+  };
+
+  const deleteSubCategory = (categoryId: string, subCatId: string): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to delete sub-categories.');
+      addAuditLog('Unauthorized Sub-category Attempt', `${currentUser.name} (${currentUser.role}) attempted to delete sub-category ${subCatId}`, 'SECURITY');
+      return false;
+    }
+    const next = categoriesList.map((c) => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          subCategories: c.subCategories.filter((s) => s.id !== subCatId),
+        };
+      }
+      return c;
+    });
+    setCategoriesList(next);
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_CATEGORIES, JSON.stringify(next));
+    const targetCat = next.find((c) => c.id === categoryId);
+    if (targetCat) {
+      syncDoc(setDoc(doc(db, 'system_categories', categoryId), sanitizeForFirestore(targetCat), { merge: true }), 'delete sub category');
+    }
+    showNotification(`Sub-category deleted by ADMIN.`);
+    addAuditLog('Sub-Category Deleted', `ADMIN deleted sub-category ${subCatId}`, 'SYSTEM');
+    return true;
+  };
+
+  const reorderCategories = (orderedIds: string[]): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to reorder categories.');
+      return false;
+    }
+    const map = new Map<string, SystemCategory>(categoriesList.map((c) => [c.id, c]));
+    const reordered: SystemCategory[] = [];
+    orderedIds.forEach((id, idx) => {
+      const item = map.get(id);
+      if (item) {
+        reordered.push({ ...item, order: idx + 1 });
+      }
+    });
+    setCategoriesList(reordered);
+    localStorage.setItem(STORAGE_KEYS.SYSTEM_CATEGORIES, JSON.stringify(reordered));
+    reordered.forEach((c) => {
+      syncDoc(setDoc(doc(db, 'system_categories', c.id), sanitizeForFirestore(c), { merge: true }), 'reorder category');
+    });
+    showNotification(`Categories reordered by ADMIN.`);
+    return true;
+  };
+
+  // 2. Sub Units Configuration (ADMIN FULL CONTROL)
+  const addSubUnit = (unit: Omit<SubUnitConfig, 'id'>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to add sub-units.');
+      return false;
+    }
+    const newId = 'unit-' + Date.now();
+    const newUnit: SubUnitConfig = { ...unit, id: newId };
+    const next = [...subUnitsList, newUnit];
+    setSubUnitsList(next);
+    localStorage.setItem(STORAGE_KEYS.SUB_UNITS, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'sub_units', newId), sanitizeForFirestore(newUnit)), 'add sub unit');
+    showNotification(`Sub Unit "${newUnit.name}" added by ADMIN.`);
+    addAuditLog('Sub Unit Added', `ADMIN created sub unit ${newUnit.name}`, 'SYSTEM');
+    return true;
+  };
+
+  const updateSubUnit = (id: string, updated: Partial<SubUnitConfig>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to edit sub-units.');
+      return false;
+    }
+    const next = subUnitsList.map((u) => (u.id === id ? { ...u, ...updated } : u));
+    setSubUnitsList(next);
+    localStorage.setItem(STORAGE_KEYS.SUB_UNITS, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'sub_units', id), sanitizeForFirestore(updated), { merge: true }), 'update sub unit');
+    showNotification(`Sub Unit updated by ADMIN.`);
+    addAuditLog('Sub Unit Updated', `ADMIN updated sub unit ${id}`, 'SYSTEM');
+    return true;
+  };
+
+  const deleteSubUnit = (id: string): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to delete sub-units.');
+      return false;
+    }
+    const next = subUnitsList.filter((u) => u.id !== id);
+    setSubUnitsList(next);
+    localStorage.setItem(STORAGE_KEYS.SUB_UNITS, JSON.stringify(next));
+    syncDoc(deleteDoc(doc(db, 'sub_units', id)), 'delete sub unit');
+    showNotification(`Sub Unit deleted by ADMIN.`);
+    addAuditLog('Sub Unit Deleted', `ADMIN deleted sub unit ${id}`, 'SYSTEM');
+    return true;
+  };
+
+  // 3. Military Ranks Configuration (ADMIN FULL CONTROL)
+  const addRank = (rank: Omit<RankConfig, 'id'>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to add military ranks.');
+      return false;
+    }
+    const newId = 'rk-' + Date.now();
+    const newRank: RankConfig = { ...rank, id: newId };
+    const next = [...ranksList, newRank];
+    setRanksList(next);
+    localStorage.setItem(STORAGE_KEYS.MILITARY_RANKS, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'military_ranks', newId), sanitizeForFirestore(newRank)), 'add rank');
+    showNotification(`Military Rank "${newRank.name}" added by ADMIN.`);
+    addAuditLog('Rank Added', `ADMIN created rank ${newRank.name}`, 'SYSTEM');
+    return true;
+  };
+
+  const updateRank = (id: string, updated: Partial<RankConfig>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to edit military ranks.');
+      return false;
+    }
+    const next = ranksList.map((r) => (r.id === id ? { ...r, ...updated } : r));
+    setRanksList(next);
+    localStorage.setItem(STORAGE_KEYS.MILITARY_RANKS, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'military_ranks', id), sanitizeForFirestore(updated), { merge: true }), 'update rank');
+    showNotification(`Rank updated by ADMIN.`);
+    addAuditLog('Rank Updated', `ADMIN updated rank ${id}`, 'SYSTEM');
+    return true;
+  };
+
+  const deleteRank = (id: string): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to delete military ranks.');
+      return false;
+    }
+    const next = ranksList.filter((r) => r.id !== id);
+    setRanksList(next);
+    localStorage.setItem(STORAGE_KEYS.MILITARY_RANKS, JSON.stringify(next));
+    syncDoc(deleteDoc(doc(db, 'military_ranks', id)), 'delete rank');
+    showNotification(`Rank deleted by ADMIN.`);
+    addAuditLog('Rank Deleted', `ADMIN deleted rank ${id}`, 'SYSTEM');
+    return true;
+  };
+
+  // 4. Authorized Establishment (AUTH) - STRICT ADMIN CONTROL ONLY
+  const updateAuthEstablishment = (id: string, updated: Partial<AuthEstablishmentItem>): boolean => {
+    if (!isAdmin) {
+      showNotification('Security Violation: Only ADMIN has permission to modify Authorized Establishment.');
+      addAuditLog('Establishment Violation Attempt', `${currentUser.name} (${currentUser.role}) attempted to alter Auth Establishment`, 'SECURITY');
+      return false;
+    }
+    const next = authEstablishmentList.map((item) => (item.id === id ? { ...item, ...updated } : item));
+    setAuthEstablishmentList(next);
+    localStorage.setItem(STORAGE_KEYS.AUTH_ESTABLISHMENT, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'auth_establishment', id), sanitizeForFirestore(updated), { merge: true }), 'update auth est');
+    showNotification(`Authorized Establishment updated by ADMIN.`);
+    addAuditLog('Auth Establishment Updated', `ADMIN updated authorized numbers for ${id}`, 'SYSTEM');
+    return true;
+  };
+
+  const addAuthEstablishmentItem = (item: Omit<AuthEstablishmentItem, 'id'>): boolean => {
+    if (!isAdmin) {
+      showNotification('Security Violation: Only ADMIN has permission to add establishment items.');
+      return false;
+    }
+    const newId = 'auth-' + Date.now();
+    const newItem: AuthEstablishmentItem = { ...item, id: newId };
+    const next = [...authEstablishmentList, newItem];
+    setAuthEstablishmentList(next);
+    localStorage.setItem(STORAGE_KEYS.AUTH_ESTABLISHMENT, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'auth_establishment', newId), sanitizeForFirestore(newItem)), 'add auth est item');
+    showNotification(`Establishment row added by ADMIN.`);
+    return true;
+  };
+
+  const deleteAuthEstablishmentItem = (id: string): boolean => {
+    if (!isAdmin) {
+      showNotification('Security Violation: Only ADMIN has permission to delete establishment items.');
+      return false;
+    }
+    const next = authEstablishmentList.filter((a) => a.id !== id);
+    setAuthEstablishmentList(next);
+    localStorage.setItem(STORAGE_KEYS.AUTH_ESTABLISHMENT, JSON.stringify(next));
+    syncDoc(deleteDoc(doc(db, 'auth_establishment', id)), 'delete auth est item');
+    showNotification(`Establishment row removed by ADMIN.`);
+    return true;
+  };
+
+  // 5. Calculation Engine Configuration (ADMIN FULL CONTROL)
+  const updateCalculationConfig = (updated: Partial<CalculationConfig>): boolean => {
+    if (!isAdmin) {
+      showNotification('Security Violation: Only ADMIN can configure calculation engine rules.');
+      addAuditLog('Calculation Rule Violation Attempt', `${currentUser.name} (${currentUser.role}) attempted to alter calculation configuration`, 'SECURITY');
+      return false;
+    }
+    const next: CalculationConfig = {
+      ...calculationConfig,
+      ...updated,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: `${currentUser.rank} ${currentUser.name} (ADMIN)`,
+    };
+    setCalculationConfig(next);
+    localStorage.setItem(STORAGE_KEYS.CALCULATION_CONFIG, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'calculation_config', next.id), sanitizeForFirestore(next), { merge: true }), 'update calc config');
+    showNotification(`Parade State Calculation Rules updated by ADMIN.`);
+    addAuditLog('Calculation Rules Updated', `ADMIN updated calculation engine rules`, 'SYSTEM');
+    return true;
+  };
+
 
   // Sync to localStorage for offline cache
   useEffect(() => {
@@ -571,7 +1049,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCurrentUserState(existing);
             return prev;
           }
-          const isLeadAdmin = user.email === '10medclk@gmail.com';
+          const isLeadAdmin = user.email === '10medclk@gmail.com' || user.email === 'mdraiyan1512@gmail.com';
           const newAcct: UserAccount = {
             id: user.uid,
             username: user.email ? user.email.split('@')[0] : `user_${user.uid.slice(0, 5)}`,
@@ -586,9 +1064,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
           setCurrentUserState(newAcct);
           // Persist user to Firestore
-          setDoc(doc(db, 'users', user.uid), sanitizeForFirestore(newAcct)).catch((e) =>
-            console.error('Error saving new user to Firestore:', e)
-          );
+          syncDoc(setDoc(doc(db, 'users', user.uid), sanitizeForFirestore(newAcct)), 'new user account');
           return [newAcct, ...prev];
         });
       }
@@ -598,8 +1074,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Real-time Firestore Listeners & Database bootstrapping
+  // Strictly respects SKILL.md: "Data Fetching: Only attach onSnapshot listeners if auth is ready and user is authenticated."
   useEffect(() => {
     setIsFirebaseReady(true);
+
+    if (!firebaseUser) {
+      // Running in local/offline mode with full nominal roll (606 personnel) and settings
+      return;
+    }
+
+    const isAuthorizedAdmin =
+      firebaseUser.email === '10medclk@gmail.com' ||
+      firebaseUser.email === 'mdraiyan1512@gmail.com' ||
+      currentUser.role === 'Admin';
 
     // 1. /users listener
     const unsubUsers = onSnapshot(
@@ -608,16 +1095,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!snapshot.empty) {
           const remoteUsers = snapshot.docs.map((d) => d.data() as UserAccount);
           setUsersList(remoteUsers);
-        } else {
+        } else if (isAuthorizedAdmin) {
           // Seed Firestore users
           INITIAL_USERS.forEach((u) => {
-            setDoc(doc(db, 'users', u.id), sanitizeForFirestore(u)).catch((e) =>
-              console.warn('User seed error:', e)
-            );
+            syncDoc(setDoc(doc(db, 'users', u.id), sanitizeForFirestore(u)), 'seed user');
           });
         }
       },
-      (err) => console.warn('Firestore users listener warning:', err)
+      (err) => console.warn('Firestore users listener notice:', err?.message || err)
     );
 
     // 2. /personnel listener
@@ -627,17 +1112,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!snapshot.empty && snapshot.docs.length >= 500) {
           const remotePersonnel = snapshot.docs.map((d) => d.data() as Personnel);
           setPersonnelList(remotePersonnel);
-        } else {
+        } else if (isAuthorizedAdmin) {
           // Seed Firestore personnel with full 606 official nominal roll
           INITIAL_PERSONNEL.forEach((p) => {
-            setDoc(doc(db, 'personnel', p.id), sanitizeForFirestore(p)).catch((e) =>
-              console.warn('Personnel seed error:', e)
-            );
+            syncDoc(setDoc(doc(db, 'personnel', p.id), sanitizeForFirestore(p)), 'seed personnel');
           });
           setPersonnelList(INITIAL_PERSONNEL);
         }
       },
-      (err) => console.warn('Firestore personnel listener warning:', err)
+      (err) => console.warn('Firestore personnel listener notice:', err?.message || err)
     );
 
     // 3. /parade_points listener
@@ -649,16 +1132,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .map((d) => d.data() as DailyParadePoint)
             .sort((a, b) => a.order - b.order);
           setDailyParadePoints(remotePoints);
-        } else {
-          // Seed Firestore parade points
+        } else if (isAuthorizedAdmin) {
           INITIAL_PARADE_POINTS.forEach((pt) => {
-            setDoc(doc(db, 'parade_points', pt.id), sanitizeForFirestore(pt)).catch((e) =>
-              console.warn('Parade point seed error:', e)
-            );
+            syncDoc(setDoc(doc(db, 'parade_points', pt.id), sanitizeForFirestore(pt)), 'seed parade points');
           });
         }
       },
-      (err) => console.warn('Firestore parade points listener warning:', err)
+      (err) => console.warn('Firestore parade points listener notice:', err?.message || err)
     );
 
     // 4. /duty_roster listener
@@ -668,16 +1148,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!snapshot.empty) {
           const remoteDuty = snapshot.docs.map((d) => d.data() as DutyAssignment);
           setDutyRoster(remoteDuty);
-        } else {
-          // Seed Firestore duty roster
+        } else if (isAuthorizedAdmin) {
           INITIAL_DUTY_ROSTER.forEach((d) => {
-            setDoc(doc(db, 'duty_roster', d.id), sanitizeForFirestore(d)).catch((e) =>
-              console.warn('Duty seed error:', e)
-            );
+            syncDoc(setDoc(doc(db, 'duty_roster', d.id), sanitizeForFirestore(d)), 'seed duty roster');
           });
         }
       },
-      (err) => console.warn('Firestore duty roster listener warning:', err)
+      (err) => console.warn('Firestore duty roster listener notice:', err?.message || err)
     );
 
     // 5. /audit_logs listener (strictly ordered by timestamp)
@@ -689,16 +1166,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .map((d) => d.data() as AuditLogItem)
             .sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
           setAuditLogs(remoteLogs);
-        } else {
-          // Seed Firestore audit logs
+        } else if (isAuthorizedAdmin) {
           INITIAL_AUDIT_LOGS.forEach((l) => {
-            setDoc(doc(db, 'audit_logs', l.id), sanitizeForFirestore(l)).catch((e) =>
-              console.warn('Audit seed error:', e)
-            );
+            syncDoc(setDoc(doc(db, 'audit_logs', l.id), sanitizeForFirestore(l)), 'seed audit logs');
           });
         }
       },
-      (err) => console.warn('Firestore audit logs listener warning:', err)
+      (err) => console.warn('Firestore audit logs listener notice:', err?.message || err)
     );
 
     // 6. /settings/regiment_settings listener
@@ -712,7 +1186,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       },
-      (err) => console.warn('Firestore settings listener warning:', err)
+      (err) => console.warn('Firestore settings listener notice:', err?.message || err)
     );
 
     // 7. /parade_types listener
@@ -725,15 +1199,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .sort((a, b) => a.order - b.order);
           setParadeTypes(remoteTypes);
           localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(remoteTypes));
-        } else {
+        } else if (isAuthorizedAdmin) {
           DEFAULT_PARADE_TYPES.forEach((t) => {
-            setDoc(doc(db, 'parade_types', t.id), sanitizeForFirestore(t)).catch((e) =>
-              console.warn('Parade type seed error:', e)
-            );
+            syncDoc(setDoc(doc(db, 'parade_types', t.id), sanitizeForFirestore(t)), 'seed parade types');
           });
         }
       },
-      (err) => console.warn('Firestore parade types warning:', err)
+      (err) => console.warn('Firestore parade types notice:', err?.message || err)
     );
 
     // 8. /parade_records listener
@@ -749,7 +1221,102 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           localStorage.setItem(STORAGE_KEYS.PARADE_RECORDS, JSON.stringify(map));
         }
       },
-      (err) => console.warn('Firestore parade records warning:', err)
+      (err) => console.warn('Firestore parade records notice:', err?.message || err)
+    );
+
+    // 9. /system_categories listener (Dynamic Categories & Sub-categories)
+    const unsubCategories = onSnapshot(
+      collection(db, 'system_categories'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteCats = snapshot.docs
+            .map((d) => d.data() as SystemCategory)
+            .sort((a, b) => a.order - b.order);
+          setCategoriesList(remoteCats);
+          localStorage.setItem(STORAGE_KEYS.SYSTEM_CATEGORIES, JSON.stringify(remoteCats));
+        } else if (isAuthorizedAdmin) {
+          INITIAL_SYSTEM_CATEGORIES.forEach((c) => {
+            syncDoc(setDoc(doc(db, 'system_categories', c.id), sanitizeForFirestore(c)), 'seed categories');
+          });
+        }
+      },
+      (err) => console.warn('Firestore categories listener notice:', err?.message || err)
+    );
+
+    // 10. /sub_units listener
+    const unsubSubUnits = onSnapshot(
+      collection(db, 'sub_units'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteUnits = snapshot.docs
+            .map((d) => d.data() as SubUnitConfig)
+            .sort((a, b) => a.order - b.order);
+          setSubUnitsList(remoteUnits);
+          localStorage.setItem(STORAGE_KEYS.SUB_UNITS, JSON.stringify(remoteUnits));
+        } else if (isAuthorizedAdmin) {
+          INITIAL_SUB_UNITS.forEach((u) => {
+            syncDoc(setDoc(doc(db, 'sub_units', u.id), sanitizeForFirestore(u)), 'seed sub units');
+          });
+        }
+      },
+      (err) => console.warn('Firestore sub_units listener notice:', err?.message || err)
+    );
+
+    // 11. /military_ranks listener
+    const unsubRanks = onSnapshot(
+      collection(db, 'military_ranks'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteRanks = snapshot.docs
+            .map((d) => d.data() as RankConfig)
+            .sort((a, b) => a.order - b.order);
+          setRanksList(remoteRanks);
+          localStorage.setItem(STORAGE_KEYS.MILITARY_RANKS, JSON.stringify(remoteRanks));
+        } else if (isAuthorizedAdmin) {
+          INITIAL_RANKS.forEach((r) => {
+            syncDoc(setDoc(doc(db, 'military_ranks', r.id), sanitizeForFirestore(r)), 'seed military ranks');
+          });
+        }
+      },
+      (err) => console.warn('Firestore military_ranks listener notice:', err?.message || err)
+    );
+
+    // 12. /auth_establishment listener
+    const unsubAuth = onSnapshot(
+      collection(db, 'auth_establishment'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteAuth = snapshot.docs.map((d) => d.data() as AuthEstablishmentItem);
+          setAuthEstablishmentList(remoteAuth);
+          localStorage.setItem(STORAGE_KEYS.AUTH_ESTABLISHMENT, JSON.stringify(remoteAuth));
+        } else if (isAuthorizedAdmin) {
+          INITIAL_AUTH_ESTABLISHMENT.forEach((a) => {
+            syncDoc(setDoc(doc(db, 'auth_establishment', a.id), sanitizeForFirestore(a)), 'seed auth establishment');
+          });
+        }
+      },
+      (err) => console.warn('Firestore auth_establishment listener notice:', err?.message || err)
+    );
+
+    // 13. /calculation_config listener
+    const unsubCalc = onSnapshot(
+      doc(db, 'calculation_config', 'default_calc_rules'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data() as CalculationConfig;
+          setCalculationConfig(data);
+          localStorage.setItem(STORAGE_KEYS.CALCULATION_CONFIG, JSON.stringify(data));
+        } else if (isAuthorizedAdmin) {
+          syncDoc(
+            setDoc(
+              doc(db, 'calculation_config', INITIAL_CALCULATION_CONFIG.id),
+              sanitizeForFirestore(INITIAL_CALCULATION_CONFIG)
+            ),
+            'seed calc config'
+          );
+        }
+      },
+      (err) => console.warn('Firestore calculation_config listener notice:', err?.message || err)
     );
 
     return () => {
@@ -761,8 +1328,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubSettings();
       unsubParadeTypes();
       unsubParadeRecords();
+      unsubCategories();
+      unsubSubUnits();
+      unsubRanks();
+      unsubAuth();
+      unsubCalc();
     };
-  }, []);
+  }, [firebaseUser, currentUser.role]);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -880,11 +1452,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addAuditLog('Logo Reset (Admin)', 'Admin restored default unit logo', 'SECURITY');
     }
     // Sync to Firestore settings
-    setDoc(
-      doc(db, 'settings', 'regiment_settings'),
-      sanitizeForFirestore({ customLogo: logo, unitName: '10 Med Regt Arty', updatedAt: new Date().toISOString() }),
-      { merge: true }
-    ).catch((e) => console.error('Error saving settings to Firestore:', e));
+    syncDoc(
+      setDoc(
+        doc(db, 'settings', 'regiment_settings'),
+        sanitizeForFirestore({ customLogo: logo, unitName: '10 Med Regt Arty', updatedAt: new Date().toISOString() }),
+        { merge: true }
+      ),
+      'save settings'
+    );
   };
 
   const syncNominalRollToCloud = async () => {
@@ -913,9 +1488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Optimistic local update
     setAuditLogs((prev) => [newLog, ...prev.slice(0, 99)]);
     // Firestore append-only write (Immutable)
-    setDoc(doc(db, 'audit_logs', newLog.id), sanitizeForFirestore(newLog)).catch((e) =>
-      console.error('Error appending audit log to Firestore:', e)
-    );
+    syncDoc(setDoc(doc(db, 'audit_logs', newLog.id), sanitizeForFirestore(newLog)), 'audit log');
   };
 
   const setCurrentUser = (user: UserAccount) => {
@@ -964,9 +1537,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'SECURITY'
     );
     // Sync to Firestore
-    setDoc(doc(db, 'users', newId), sanitizeForFirestore(newUser)).catch((e) =>
-      console.error('Error adding user to Firestore:', e)
-    );
+    syncDoc(setDoc(doc(db, 'users', newId), sanitizeForFirestore(newUser)), 'add user');
   };
 
   const updateUser = (id: string, updated: Partial<UserAccount>) => {
@@ -987,9 +1558,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('User Updated (Admin)', `Modified user settings for ID ${id}`, 'SECURITY');
     // Sync to Firestore
     if (finalUpdated) {
-      setDoc(doc(db, 'users', id), sanitizeForFirestore(finalUpdated), { merge: true }).catch((e) =>
-        console.error('Error updating user in Firestore:', e)
-      );
+      syncDoc(setDoc(doc(db, 'users', id), sanitizeForFirestore(finalUpdated), { merge: true }), 'update user');
     }
   };
 
@@ -1004,7 +1573,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification(`User @${target.username} (${target.name}) removed.`);
     addAuditLog('User Deleted (Admin)', `Deleted user account @${target.username} (${target.name})`, 'SECURITY');
     // Delete from Firestore
-    deleteDoc(doc(db, 'users', id)).catch((e) => console.error('Error deleting user from Firestore:', e));
+    syncDoc(deleteDoc(doc(db, 'users', id)), 'delete user');
   };
 
   const addPersonnel = (person: Omit<Personnel, 'id'>) => {
@@ -1018,9 +1587,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'PERSONNEL'
     );
     // Write to Firestore
-    setDoc(doc(db, 'personnel', newId), sanitizeForFirestore(newPerson)).catch((e) =>
-      console.error('Error adding personnel to Firestore:', e)
-    );
+    syncDoc(setDoc(doc(db, 'personnel', newId), sanitizeForFirestore(newPerson)), 'add personnel');
   };
 
   const updatePersonnel = (id: string, updated: Partial<Personnel>) => {
@@ -1038,9 +1605,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('Personnel Updated', `Modified record for ID: ${id}`, 'PERSONNEL');
     // Write to Firestore
     if (updatedRecord) {
-      setDoc(doc(db, 'personnel', id), sanitizeForFirestore(updatedRecord), { merge: true }).catch((e) =>
-        console.error('Error updating personnel in Firestore:', e)
-      );
+      syncDoc(setDoc(doc(db, 'personnel', id), sanitizeForFirestore(updatedRecord), { merge: true }), 'update personnel');
     }
   };
 
@@ -1051,9 +1616,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showNotification(`Record for ${target.rk} ${target.name} removed from active roll.`);
       addAuditLog('Personnel Deleted', `Deleted ${target.rk} ${target.name} (${target.snkNo})`, 'PERSONNEL');
       // Delete from Firestore
-      deleteDoc(doc(db, 'personnel', id)).catch((e) =>
-        console.error('Error deleting personnel from Firestore:', e)
-      );
+      syncDoc(deleteDoc(doc(db, 'personnel', id)), 'delete personnel');
     }
   };
 
@@ -1088,9 +1651,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     // Write to Firestore
     if (updatedDoc) {
-      setDoc(doc(db, 'personnel', id), sanitizeForFirestore(updatedDoc), { merge: true }).catch((e) =>
-        console.error('Error updating parade status in Firestore:', e)
-      );
+      syncDoc(setDoc(doc(db, 'personnel', id), sanitizeForFirestore(updatedDoc), { merge: true }), 'update parade status');
     }
   };
 
@@ -1112,15 +1673,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('Batch Status Update', `Updated ${ids.length} records to ${status}`, 'PARADE_STATE');
     // Batch sync to Firestore
     ids.forEach((id) => {
-      setDoc(
-        doc(db, 'personnel', id),
-        sanitizeForFirestore({
-          status,
-          statusDetails: statusDetails ?? null,
-          outOfUnitCategory: status === 'Present' ? null : undefined,
-        }),
-        { merge: true }
-      ).catch((e) => console.error('Error batch updating personnel in Firestore:', e));
+      syncDoc(
+        setDoc(
+          doc(db, 'personnel', id),
+          sanitizeForFirestore({
+            status,
+            statusDetails: statusDetails ?? null,
+            outOfUnitCategory: status === 'Present' ? null : undefined,
+          }),
+          { merge: true }
+        ),
+        'batch update status'
+      );
     });
   };
 
@@ -1174,9 +1738,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'PARADE_STATE'
     );
     // Sync to Firestore
-    setDoc(doc(db, 'personnel', personnelId), sanitizeForFirestore(patch), { merge: true }).catch((e) =>
-      console.error('Error assigning out of unit in Firestore:', e)
-    );
+    syncDoc(setDoc(doc(db, 'personnel', personnelId), sanitizeForFirestore(patch), { merge: true }), 'assign out of unit');
   };
 
   const cancelOutOfUnit = (personnelId: string) => {
@@ -1218,9 +1780,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'PARADE_STATE'
     );
     // Sync to Firestore
-    setDoc(doc(db, 'personnel', personnelId), patch, { merge: true }).catch((e) =>
-      console.error('Error cancelling out of unit in Firestore:', e)
-    );
+    syncDoc(setDoc(doc(db, 'personnel', personnelId), patch, { merge: true }), 'cancel out of unit');
   };
 
   // Daily Parade State Management Handlers
@@ -1260,9 +1820,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     // Sync to Firestore
     if (updatedPt) {
-      setDoc(doc(db, 'parade_points', pointId), sanitizeForFirestore(updatedPt), { merge: true }).catch((e) =>
-        console.error('Error updating parade point in Firestore:', e)
-      );
+      syncDoc(setDoc(doc(db, 'parade_points', pointId), sanitizeForFirestore(updatedPt), { merge: true }), 'update parade point count');
     }
   };
 
@@ -1287,9 +1845,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification(`Updated parade point visibility for ${battery}`);
     // Sync to Firestore
     if (updatedPt) {
-      setDoc(doc(db, 'parade_points', pointId), sanitizeForFirestore(updatedPt), { merge: true }).catch((e) =>
-        console.error('Error toggling parade point in Firestore:', e)
-      );
+      syncDoc(setDoc(doc(db, 'parade_points', pointId), sanitizeForFirestore(updatedPt), { merge: true }), 'toggle point battery');
     }
   };
 
@@ -1310,9 +1866,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification(`RSM point suggestion updated.`);
     // Sync to Firestore
     if (updatedPt) {
-      setDoc(doc(db, 'parade_points', pointId), sanitizeForFirestore(updatedPt), { merge: true }).catch((e) =>
-        console.error('Error updating RSM suggestion in Firestore:', e)
-      );
+      syncDoc(setDoc(doc(db, 'parade_points', pointId), sanitizeForFirestore(updatedPt), { merge: true }), 'set rsm suggestion');
     }
   };
 
@@ -1338,9 +1892,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification(`Added new Daily Parade point: "${trimmed}"`);
     addAuditLog('Parade Point Added', `Added parade duty point "${trimmed}"`, 'PARADE_STATE');
     // Sync to Firestore
-    setDoc(doc(db, 'parade_points', newId), sanitizeForFirestore(newPoint)).catch((e) =>
-      console.error('Error adding parade point to Firestore:', e)
-    );
+    syncDoc(setDoc(doc(db, 'parade_points', newId), sanitizeForFirestore(newPoint)), 'add parade point');
   };
 
   const deleteDailyParadePoint = (pointId: string) => {
@@ -1349,9 +1901,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification(`Parade point "${target?.name}" removed.`);
     addAuditLog('Parade Point Removed', `Removed point "${target?.name}"`, 'PARADE_STATE');
     // Delete from Firestore
-    deleteDoc(doc(db, 'parade_points', pointId)).catch((e) =>
-      console.error('Error deleting parade point from Firestore:', e)
-    );
+    syncDoc(deleteDoc(doc(db, 'parade_points', pointId)), 'delete parade point');
   };
 
   const toggleDailyParadePointActive = (pointId: string, active: boolean) => {
@@ -1359,9 +1909,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((p) => (p.id === pointId ? { ...p, isActive: active } : p))
     );
     // Sync to Firestore
-    setDoc(doc(db, 'parade_points', pointId), { isActive: active }, { merge: true }).catch((e) =>
-      console.error('Error updating parade point active status in Firestore:', e)
-    );
+    syncDoc(setDoc(doc(db, 'parade_points', pointId), { isActive: active }, { merge: true }), 'toggle parade point active');
   };
 
   const addDutyAssignment = (assignment: Omit<DutyAssignment, 'id'>) => {
@@ -1373,9 +1921,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification(`New duty roster created for ${assignment.dutyType}`);
     addAuditLog('Duty Assigned', `Scheduled ${assignment.dutyType} on ${assignment.date}`, 'PARADE_STATE');
     // Sync to Firestore
-    setDoc(doc(db, 'duty_roster', newAssignment.id), sanitizeForFirestore(newAssignment)).catch((e) =>
-      console.error('Error saving duty assignment to Firestore:', e)
-    );
+    syncDoc(setDoc(doc(db, 'duty_roster', newAssignment.id), sanitizeForFirestore(newAssignment)), 'add duty assignment');
   };
 
   const getBatterySummaries = (): BatteryParadeSummary[] => {
@@ -1452,6 +1998,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         setCurrentUser,
         switchRole,
+        isAdmin,
+        isRSM,
         usersList,
         addUser,
         updateUser,
@@ -1480,6 +2028,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notification,
         showNotification,
 
+        // Dynamic Categories & Sub-Categories (ADMIN CONTROL)
+        categoriesList,
+        addCategory,
+        updateCategory,
+        deleteCategory,
+        addSubCategory,
+        updateSubCategory,
+        deleteSubCategory,
+        reorderCategories,
+
+        // Sub Units (ADMIN CONTROL)
+        subUnitsList,
+        addSubUnit,
+        updateSubUnit,
+        deleteSubUnit,
+
+        // Military Ranks (ADMIN CONTROL)
+        ranksList,
+        addRank,
+        updateRank,
+        deleteRank,
+
+        // Authorized Establishment (ADMIN CONTROL)
+        authEstablishmentList,
+        updateAuthEstablishment,
+        addAuthEstablishmentItem,
+        deleteAuthEstablishmentItem,
+
+        // Calculation Engine Configuration (ADMIN CONTROL)
+        calculationConfig,
+        updateCalculationConfig,
+
         dailyParadePoints,
         updateParadePointCount,
         togglePointForBattery,
@@ -1495,6 +2075,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedParadeDate,
         paradeTypes,
         addParadeType,
+        updateParadeType,
+        deleteParadeType,
         paradeRecords,
         getParadeRecord,
         saveParadeRecordCounts,

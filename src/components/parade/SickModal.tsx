@@ -100,9 +100,6 @@ export const SickModal: React.FC<SickModalProps> = ({
                   {sickPersonnel.length} Under Medical Care
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono">
-                10 Med Regt Arty Combined Military Hospital (CMH) & Regimental MI Room Sick Report
-              </p>
             </div>
           </div>
 
@@ -199,9 +196,6 @@ export const SickModal: React.FC<SickModalProps> = ({
             <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/80">
               <HeartPulse className="w-10 h-10 text-slate-600 mx-auto mb-2" />
               <p className="text-sm font-semibold text-slate-300">No personnel currently admitted or sick</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Try switching between CMH or Sic filters or changing battery selection.
-              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">

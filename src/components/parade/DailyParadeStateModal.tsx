@@ -47,6 +47,9 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
 }) => {
   const {
     dailyParadePoints,
+    categoriesList,
+    isAdmin,
+    isRSM,
     updateParadePointCount,
     togglePointForBattery,
     setRsmPointSuggestion,
@@ -67,9 +70,51 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
   const isRsmOrAdmin =
     currentUser.role === 'RSM' ||
     currentUser.role === 'Admin' ||
-    currentUser.role === 'CO';
+    currentUser.role === 'CO' ||
+    isAdmin ||
+    isRSM;
 
   const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
+
+  // Combine dynamic categories with daily parade points so any ADMIN category changes reflect here automatically
+  const dynamicParadePoints = useMemo<DailyParadePoint[]>(() => {
+    if (categoriesList && categoriesList.length > 0) {
+      const list: DailyParadePoint[] = [];
+      categoriesList.forEach((cat) => {
+        if (!cat.isActive) return;
+        cat.subCategories.forEach((sub) => {
+          if (!sub.isActive) return;
+          const existing = dailyParadePoints.find(
+            (dp) => dp.id === sub.id || dp.name.toLowerCase() === sub.name.toLowerCase()
+          );
+
+          list.push({
+            id: sub.id,
+            name: sub.name,
+            isActive: sub.isActive,
+            category: cat.name,
+            order: sub.order,
+            enabledBatteries:
+              (sub.applicableSubUnits as Battery[]) ||
+              (cat.applicableSubUnits as Battery[]) ||
+              ALL_BATTERIES,
+            counts: existing?.counts || sub.counts || {
+              'HQ Bty': { offr: 0, jco: 0, or: 0 },
+              'P Bty': { offr: 0, jco: 0, or: 0 },
+              'Q Bty': { offr: 0, jco: 0, or: 0 },
+              'R Bty': { offr: 0, jco: 0, or: 0 },
+            },
+            lockedByRsm: existing?.lockedByRsm,
+            rsmSuggestedCounts: existing?.rsmSuggestedCounts,
+            lastUpdated: existing?.lastUpdated,
+            rsmFixedAt: existing?.rsmFixedAt,
+          });
+        });
+      });
+      return list;
+    }
+    return dailyParadePoints;
+  }, [categoriesList, dailyParadePoints]);
 
   // Active view tab: 'HQ Bty' | 'P Bty' | 'Q Bty' | 'R Bty' | 'Consolidated'
   const [activeTab, setActiveTab] = useState<Battery | 'Consolidated'>(
@@ -97,7 +142,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     Record<string, Record<Battery, ParadePointCount>>
   >(() => {
     const buffer: Record<string, Record<Battery, ParadePointCount>> = {};
-    dailyParadePoints.forEach((pt) => {
+    dynamicParadePoints.forEach((pt) => {
       buffer[pt.id] = {
         'HQ Bty': { ...pt.counts['HQ Bty'] },
         'P Bty': { ...pt.counts['P Bty'] },
@@ -108,10 +153,10 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     return buffer;
   });
 
-  // Keep buffer in sync when modal opens
+  // Keep buffer in sync when modal opens or dynamic points update
   React.useEffect(() => {
     const buffer: Record<string, Record<Battery, ParadePointCount>> = {};
-    dailyParadePoints.forEach((pt) => {
+    dynamicParadePoints.forEach((pt) => {
       buffer[pt.id] = {
         'HQ Bty': { ...pt.counts['HQ Bty'] },
         'P Bty': { ...pt.counts['P Bty'] },
@@ -120,11 +165,11 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
       };
     });
     setCountsBuffer(buffer);
-  }, [isOpen, dailyParadePoints]);
+  }, [isOpen, dynamicParadePoints]);
 
   // Points visible for the active tab
   const visiblePoints = useMemo(() => {
-    return dailyParadePoints.filter((pt) => {
+    return dynamicParadePoints.filter((pt) => {
       if (!pt.isActive) return false;
       if (activeTab === 'Consolidated') return true;
       return (
@@ -133,7 +178,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
         pt.enabledBatteries.length === 0
       );
     });
-  }, [dailyParadePoints, activeTab]);
+  }, [dynamicParadePoints, activeTab]);
 
   // Autocomplete suggestions for new point
   const pointSuggestions = useMemo(() => {
@@ -473,51 +518,51 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                 }`}
               >
                 <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                <span>RSM Central Settings & Points</span>
+                <span>Battery Visibility Controls</span>
               </button>
             )}
 
-            {/* ONLY RSM & ADMIN can add new points / boxes */}
-            {isRsmOrAdmin && (
+            {/* ONLY ADMIN can add new points / boxes */}
+            {isAdmin && (
               <button
                 onClick={() => setIsAddingNewPoint(!isAddingNewPoint)}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Box / Point (RSM Only)</span>
+                <span>+ Add Parade Point (Admin)</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* RSM Central Settings Panel */}
+        {/* Visibility Controls Panel */}
         {showRsmControls && isRsmOrAdmin && (
           <div className="px-6 py-4 bg-slate-950 border-b border-amber-500/30 space-y-3 animate-fadeIn">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-amber-400" />
                 <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
-                  RSM Central Configuration & Battery Visibility Controls
+                  Parade Points Battery Visibility Controls
                 </h4>
               </div>
-              <span className="text-[11px] text-slate-400">
-                Regimental Sergeant Major Master Controls
-              </span>
             </div>
 
-            <p className="text-xs text-slate-300">
-              Select which batteries participate in each duty point. BSMs in unticked batteries will not see that specific point in their daily parade submission sheet.
-            </p>
-
             <div className="max-h-40 overflow-y-auto pr-2 space-y-1.5 scrollbar-thin">
-              {dailyParadePoints.map((pt) => {
+              {dynamicParadePoints.map((pt) => {
                 const enabled = pt.enabledBatteries || ALL_BATTERIES;
                 return (
                   <div
                     key={pt.id}
                     className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs"
                   >
-                    <span className="font-semibold text-white">{pt.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-white">{pt.name}</span>
+                      {pt.category && (
+                        <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
+                          {pt.category}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3">
                       {ALL_BATTERIES.map((bty) => {
                         const isChecked = enabled.includes(bty);
@@ -538,13 +583,15 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                           </label>
                         );
                       })}
-                      <button
-                        onClick={() => deleteDailyParadePoint(pt.id)}
-                        className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors ml-2"
-                        title="Delete Point"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => deleteDailyParadePoint(pt.id)}
+                          className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors ml-2"
+                          title="Delete Point (Admin Only)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

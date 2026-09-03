@@ -15,6 +15,30 @@ export const isOfficerRank = (rank?: string): boolean => {
   return OFFICER_RANKS.includes(rank);
 };
 
+export const JCO_RANKS: string[] = ['MWO', 'SWO', 'WO'];
+
+export const isJCORank = (rank?: string): boolean => {
+  if (!rank) return false;
+  return JCO_RANKS.includes(rank);
+};
+
+export const OR_RANKS: string[] = ['Sgt', 'Cpl', 'Lcpl', 'Snk', 'Gnr', 'SNK DMT)'];
+
+export const isORRank = (rank?: string): boolean => {
+  if (!rank) return false;
+  return OR_RANKS.includes(rank);
+};
+
+export const isCivilianRank = (rank?: string, trade?: string): boolean => {
+  if (!rank) return false;
+  return rank === 'Civilian' || rank === 'NC(E)' || rank === 'NC(U)' || trade === 'Civilian' || trade === 'NC(E)';
+};
+
+export const isRCORank = (rank?: string, trade?: string): boolean => {
+  if (!rank) return false;
+  return rank === 'RCO' || trade === 'RCO';
+};
+
 export type Battery = 'P Bty' | 'Q Bty' | 'R Bty' | 'HQ Bty';
 
 export const ALL_BATTERIES: Battery[] = ['P Bty', 'Q Bty', 'R Bty', 'HQ Bty'];
@@ -30,7 +54,11 @@ export type MilitaryRank =
   | 'Sgt'
   | 'Cpl'
   | 'Lcpl'
-  | 'Snk';
+  | 'Snk'
+  | 'Civilian'
+  | 'RCO'
+  | 'NC(E)'
+  | 'NC(U)';
 
 export const ALL_RANKS: MilitaryRank[] = [
   'Lt Col',
@@ -44,6 +72,9 @@ export const ALL_RANKS: MilitaryRank[] = [
   'Cpl',
   'Lcpl',
   'Snk',
+  'Civilian',
+  'RCO',
+  'NC(E)',
 ];
 
 export type Trade =
@@ -57,6 +88,8 @@ export type Trade =
   | 'Ck(M)'
   | 'NC(E)'
   | 'NC(U)'
+  | 'Civilian'
+  | 'RCO'
   | '-';
 
 export const ALL_TRADES: Trade[] = [
@@ -70,6 +103,8 @@ export const ALL_TRADES: Trade[] = [
   'Ck(M)',
   'NC(E)',
   'NC(U)',
+  'Civilian',
+  'RCO',
 ];
 
 export type OutOfUnitCategory =
@@ -171,6 +206,7 @@ export interface DailyParadePoint {
   name: string;
   order: number;
   isActive: boolean;
+  category?: string;
   enabledBatteries: Battery[]; // Which batteries have this row enabled
   counts: {
     'HQ Bty': ParadePointCount;
@@ -179,6 +215,10 @@ export interface DailyParadePoint {
     'R Bty': ParadePointCount;
   };
   rsmSuggested?: ParadePointCount;
+  lockedByRsm?: Record<string, boolean>;
+  rsmSuggestedCounts?: Record<string, ParadePointCount>;
+  lastUpdated?: Record<string, string>;
+  rsmFixedAt?: Record<string, string>;
 }
 
 export type ParadeSessionType = 'Morning' | 'Second Period' | 'Games' | 'Roll Call' | string;
@@ -276,3 +316,88 @@ export interface AuditLogItem {
   details: string;
   category: 'PARADE_STATE' | 'PERSONNEL' | 'SYSTEM' | 'SECURITY';
 }
+
+export type RankCategory = 'Officer' | 'JCO' | 'OR' | 'Civilian' | 'RCO';
+
+export interface SubCategoryItem {
+  id: string;
+  name: string;
+  order: number;
+  isActive: boolean;
+  isCalculated?: boolean;
+  contributesToTotalOut?: boolean;
+  contributesToOffParade?: boolean;
+  contributesToOnParade?: boolean;
+  applicableSubUnits?: string[]; // e.g. ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty', 'WKSP'] or empty for all
+  applicableRankCategories?: RankCategory[];
+  description?: string;
+  counts?: Record<string, ParadePointCount>; // Optional default/sample counts
+}
+
+export interface SystemCategory {
+  id: string;
+  name: string;
+  code?: string;
+  order: number;
+  isActive: boolean;
+  type: 'PARADE_STATE' | 'OUT_OF_UNIT' | 'DUTY_ROSTER' | 'ADMINISTRATIVE' | 'GENERAL';
+  assignedParadeStates: string[]; // e.g. ['Morning', 'Second Period', 'Games', 'Roll Call']
+  applicableSubUnits: string[]; // e.g. ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'] or ['ALL']
+  applicableRankCategories: RankCategory[];
+  subCategories: SubCategoryItem[];
+  description?: string;
+}
+
+export interface SubUnitConfig {
+  id: string;
+  code: Battery | string;
+  name: string;
+  order: number;
+  isActive: boolean;
+  commanderTitle?: string;
+  description?: string;
+  role?: 'HQ' | 'GUN_BATTERY' | 'OTHER' | string;
+}
+
+export interface RankConfig {
+  id: string;
+  name: string;
+  code: string;
+  category: RankCategory;
+  order: number;
+  seniority: number;
+  isActive: boolean;
+  banglaName?: string;
+}
+
+export interface AuthEstablishmentItem {
+  id: string;
+  category: RankCategory | 'Total' | string;
+  authorized?: number;
+  hqBty?: number;
+  pBty?: number;
+  qBty?: number;
+  rBty?: number;
+  wksp?: number;
+  notes?: string;
+  subUnit?: string;
+  offr?: number;
+  jco?: number;
+  or?: number;
+  total?: number;
+}
+
+export interface CalculationConfig {
+  id: string;
+  totalOutCategories: string[]; // Category or subcategory IDs/names contributing to TOTAL OUT
+  offParadeCategories: string[]; // Category or subcategory IDs/names contributing to OFF PARADE
+  onParadeFormula: 'POSTED_MINUS_ALL' | 'DIRECT_MUSTER' | string;
+  autoCalculateOffParade?: boolean;
+  autoCalculateOnParade?: boolean;
+  strictDiscrepancyCheck?: boolean;
+  totalOutFormula?: string;
+  offParadeFormula?: string;
+  lastUpdated?: string;
+  updatedBy?: string;
+}
+

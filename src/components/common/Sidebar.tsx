@@ -267,14 +267,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <Icon className="w-4 h-4" />
                     </div>
-                    <div className="truncate">
-                      <div className="font-semibold text-xs truncate flex items-center gap-1.5">
-                        <span>{item.label}</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 truncate mt-0.5 font-normal">
-                        {item.description}
-                      </div>
-                    </div>
+                    <span className="font-semibold text-xs truncate">
+                      {item.label}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">

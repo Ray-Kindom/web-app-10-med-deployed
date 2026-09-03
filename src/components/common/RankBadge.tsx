@@ -17,10 +17,12 @@ export const RankBadge: React.FC<RankBadgeProps> = ({
       case 'Maj':
       case 'Capt':
       case 'Lt':
+      case '2Lt':
         return {
           bg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
           category: 'Officer',
         };
+      case 'MWO':
       case 'SWO':
       case 'WO':
         return {
@@ -32,14 +34,26 @@ export const RankBadge: React.FC<RankBadgeProps> = ({
       case 'Lcpl':
         return {
           bg: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-          category: 'NCO',
+          category: 'OR',
+        };
+      case 'Civilian':
+      case 'NC(E)':
+      case 'NC(U)':
+        return {
+          bg: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+          category: 'Civilian',
+        };
+      case 'RCO':
+        return {
+          bg: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+          category: 'RCO',
         };
       case 'Snk':
       case 'Gnr':
       default:
         return {
           bg: 'bg-slate-800 text-slate-300 border-slate-700',
-          category: 'Soldier',
+          category: 'OR',
         };
     }
   };

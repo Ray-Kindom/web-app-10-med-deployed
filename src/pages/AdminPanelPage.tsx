@@ -3,6 +3,11 @@ import { useApp } from '../context/AppContext';
 import { Role, Battery, UserAccount } from '../types';
 import { UserManagementModal } from '../components/admin/UserManagementModal';
 import { UnitLogo } from '../components/common/UnitLogo';
+import { CategoryManagementTab } from '../components/admin/CategoryManagementTab';
+import { ParadeStateManagementTab } from '../components/admin/ParadeStateManagementTab';
+import { AuthEstablishmentTab } from '../components/admin/AuthEstablishmentTab';
+import { SubUnitsAndRanksTab } from '../components/admin/SubUnitsAndRanksTab';
+import { CalculationRulesTab } from '../components/admin/CalculationRulesTab';
 import {
   Settings,
   Shield,
@@ -26,6 +31,10 @@ import {
   Image as ImageIcon,
   Upload,
   RefreshCw,
+  Layers,
+  CalendarDays,
+  Calculator,
+  Award,
 } from 'lucide-react';
 
 export const AdminPanelPage: React.FC = () => {
@@ -44,7 +53,9 @@ export const AdminPanelPage: React.FC = () => {
   } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [activeTab, setActiveTab] = useState<'ROLES' | 'AUDIT' | 'LOGO' | 'FIREBASE'>('ROLES');
+  const [activeTab, setActiveTab] = useState<
+    'CATEGORIES' | 'PARADE_STATES' | 'ESTABLISHMENT' | 'SUB_UNITS' | 'CALCULATIONS' | 'ROLES' | 'AUDIT' | 'LOGO' | 'FIREBASE'
+  >('CATEGORIES');
   const [userSearch, setUserSearch] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
@@ -172,9 +183,6 @@ export const AdminPanelPage: React.FC = () => {
             <h1 className="text-2xl font-bold text-white tracking-tight font-sans mt-1">
               Admin & System Security Panel
             </h1>
-            <p className="text-xs text-slate-400 font-mono">
-              Manage 10 Med Regt user accounts, assign multiple batteries, access levels, unit logo & security audit logs.
-            </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -192,31 +200,94 @@ export const AdminPanelPage: React.FC = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80 flex-wrap">
+        <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800/80 flex-wrap">
+          <button
+            onClick={() => setActiveTab('CATEGORIES')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'CATEGORIES'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white bg-slate-900'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Categories & Sub-Categories</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('PARADE_STATES')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'PARADE_STATES'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white bg-slate-900'
+            }`}
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>Parade States</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ESTABLISHMENT')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'ESTABLISHMENT'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white bg-slate-900'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Auth Establishment</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('SUB_UNITS')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'SUB_UNITS'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white bg-slate-900'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span>Sub Units & Ranks</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('CALCULATIONS')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'CALCULATIONS'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white bg-slate-900'
+            }`}
+          >
+            <Calculator className="w-3.5 h-3.5" />
+            <span>Calculation Rules</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('ROLES')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'ROLES'
                 ? 'bg-rose-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-white bg-slate-900'
             }`}
           >
-            User Accounts & Batteries ({usersList.length})
+            <Users className="w-3.5 h-3.5" />
+            <span>User Accounts ({usersList.length})</span>
           </button>
+
           <button
             onClick={() => setActiveTab('LOGO')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'LOGO'
                 ? 'bg-rose-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-white bg-slate-900'
             }`}
           >
             <ImageIcon className="w-3.5 h-3.5" />
-            <span>Unit Logo Management</span>
+            <span>Unit Logo</span>
           </button>
+
           <button
             onClick={() => setActiveTab('AUDIT')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'AUDIT'
                 ? 'bg-rose-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-white bg-slate-900'
@@ -224,24 +295,36 @@ export const AdminPanelPage: React.FC = () => {
           >
             <Shield className="w-3.5 h-3.5" />
             <span>Audit Logs ({auditLogs.length})</span>
-            {!isAdmin && (
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300">
-                Admin Only
-              </span>
-            )}
           </button>
+
           <button
             onClick={() => setActiveTab('FIREBASE')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'FIREBASE'
                 ? 'bg-rose-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-white bg-slate-900'
             }`}
           >
-            Firebase Schema Architecture
+            <Server className="w-3.5 h-3.5" />
+            <span>Cloud Architecture</span>
           </button>
         </div>
       </div>
+
+      {/* Dynamic Categories Tab */}
+      {activeTab === 'CATEGORIES' && <CategoryManagementTab />}
+
+      {/* Parade States Tab */}
+      {activeTab === 'PARADE_STATES' && <ParadeStateManagementTab />}
+
+      {/* Auth Establishment Tab */}
+      {activeTab === 'ESTABLISHMENT' && <AuthEstablishmentTab />}
+
+      {/* Sub Units & Ranks Tab */}
+      {activeTab === 'SUB_UNITS' && <SubUnitsAndRanksTab />}
+
+      {/* Calculation Rules Tab */}
+      {activeTab === 'CALCULATIONS' && <CalculationRulesTab />}
 
       {/* Tab 1: Roles & Battery Assignments */}
       {activeTab === 'ROLES' && (
@@ -257,9 +340,6 @@ export const AdminPanelPage: React.FC = () => {
                       {filteredUsers.length} of {usersList.length} Users
                     </span>
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Create new user accounts, assign single or multiple batteries, set access levels, or delete accounts
-                  </p>
                 </div>
 
                 <button
@@ -484,9 +564,6 @@ export const AdminPanelPage: React.FC = () => {
                   <ImageIcon className="w-5 h-5 text-rose-400" />
                   <span>Unit Heraldic Logo Management</span>
                 </h3>
-                <p className="text-xs text-slate-400">
-                  Only the System Administrator is authorized to upload and update the official regiment logo.
-                </p>
               </div>
 
               <span className="text-xs font-mono font-bold px-2.5 py-1 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
@@ -510,9 +587,6 @@ export const AdminPanelPage: React.FC = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <h4 className="text-sm font-bold text-white">Upload New Unit Logo</h4>
-                  <p className="text-xs text-slate-400">
-                    Upload an official unit insignia or crest image (PNG, JPG, or SVG format). The logo will update across headers, modals, and export print sheets.
-                  </p>
                 </div>
 
                 <input
@@ -605,9 +679,6 @@ export const AdminPanelPage: React.FC = () => {
                   <h3 className="text-base font-bold text-white font-sans mt-1">
                     Military System Audit & Activity Logs
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Immutable security record of personnel changes, parade status updates & user logins
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap text-xs">

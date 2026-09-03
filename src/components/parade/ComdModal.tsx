@@ -96,9 +96,6 @@ export const ComdModal: React.FC<ComdModalProps> = ({
                   {comdPersonnel.length} On Command Assignment
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono">
-                10 Med Regt Arty Temporary Duty (TD), Higher HQ Liaison, and External Formations Attachment
-              </p>
             </div>
           </div>
 
@@ -193,9 +190,6 @@ export const ComdModal: React.FC<ComdModalProps> = ({
             <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/80">
               <Compass className="w-10 h-10 text-slate-600 mx-auto mb-2" />
               <p className="text-sm font-semibold text-slate-300">No personnel on external command assignment</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Try switching category or changing battery selection.
-              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">

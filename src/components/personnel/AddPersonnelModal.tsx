@@ -127,9 +127,6 @@ export const AddPersonnelModal: React.FC<AddPersonnelModalProps> = ({
                   Nominal Roll Entry
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                10 Medium Regiment Artillery — Enlist Newly Posted In or Training Completed Personnel
-              </p>
             </div>
           </div>
           <button

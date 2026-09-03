@@ -351,9 +351,6 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   ADMIN ONLY
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">
-                Configure user credentials, military rank, system role & battery permissions
-              </p>
             </div>
           </div>
           <button
@@ -461,9 +458,6 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   className="hidden"
                 />
               </label>
-              <p className="text-[10px] text-slate-500 mt-1">
-                JPG, PNG or WebP. Will display in header and login card.
-              </p>
             </div>
           </div>
 
@@ -654,9 +648,6 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   <Building2 className="w-3.5 h-3.5 text-rose-400" />
                   <span>Assigned Battery Permissions (Multi-Battery Access)</span>
                 </label>
-                <p className="text-[11px] text-slate-400">
-                  Select which batteries this user has authorization to view/manage (can select 1 or multiple)
-                </p>
               </div>
               <button
                 type="button"

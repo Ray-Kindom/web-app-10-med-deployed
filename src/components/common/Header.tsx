@@ -175,8 +175,8 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {roleDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-2 z-50 text-slate-200 divide-y divide-slate-800">
-                    <div className="px-3 py-2 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-                      Simulate Unit Role Access (Admin Only):
+                    <div className="px-3 py-1.5 text-[11px] text-slate-400 font-semibold font-mono">
+                      Switch Role
                     </div>
 
                     <div className="py-1">
@@ -187,19 +187,16 @@ export const Header: React.FC<HeaderProps> = ({
                             switchRole(r.role, r.bty);
                             setRoleDropdownOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-xs flex flex-col hover:bg-slate-800 transition-colors ${
-                            currentUser.role === r.role ? 'bg-rose-950/40 border-l-2 border-rose-500 text-white' : ''
+                          className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-800 transition-colors ${
+                            currentUser.role === r.role ? 'bg-rose-950/40 border-l-2 border-rose-500 text-white font-bold' : ''
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-100">{r.label}</span>
-                            {r.bty && (
-                              <span className="text-[10px] font-mono bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
-                                {r.bty}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-slate-400 mt-0.5">{r.desc}</span>
+                          <span className="text-slate-100">{r.label}</span>
+                          {r.bty && (
+                            <span className="text-[10px] font-mono bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
+                              {r.bty}
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -221,13 +218,15 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Firebase Live Cloud Sync Indicator */}
+            {/* Firebase Cloud Sync Indicator */}
             <div
               className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs font-mono"
-              title="Real-time Firestore Synchronized"
+              title={firebaseUser ? "Real-time Firebase Cloud Synchronized" : "Local Fast-Storage Ready"}
             >
-              <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span className="text-[11px] text-emerald-400 font-bold">Cloud Live</span>
+              <Cloud className={`w-3.5 h-3.5 ${firebaseUser ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+              <span className={`text-[11px] font-bold ${firebaseUser ? 'text-emerald-400' : 'text-slate-300'}`}>
+                {firebaseUser ? 'Cloud Live' : 'Local Ready'}
+              </span>
             </div>
 
             {/* Profile Pill with User Photo & Name Initials */}

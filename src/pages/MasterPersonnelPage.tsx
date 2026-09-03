@@ -1,14 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { PersonnelTable } from '../components/personnel/PersonnelTable';
-import { Personnel, Battery } from '../types';
-import { UserPlus, Layers, Building2 } from 'lucide-react';
+import {
+  Personnel,
+  Battery,
+  isOfficerRank,
+  isJCORank,
+  isORRank,
+  isCivilianRank,
+  isRCORank,
+} from '../types';
+import { UserPlus, Layers, Building2, ChevronDown } from 'lucide-react';
 
 interface MasterPersonnelPageProps {
   onViewDossier: (person: Personnel) => void;
   onOpenAddModal: () => void;
   onOpenPrintModal: () => void;
 }
+
+type RankCategoryFilter = 'ALL' | 'OFFICER' | 'JCO' | 'OR' | 'CIVILIAN' | 'RCO' | 'OTHERS';
 
 export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
   onViewDossier,
@@ -26,16 +36,75 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
   const initialBattery: Battery = currentUser.assignedBattery || 'P Bty';
   const [activeBatteryTab, setActiveBatteryTab] = useState<Battery>(initialBattery);
 
-  // Filter list depending on selected mode
-  const displayedPersonnel = viewMode === 'REGT'
-    ? personnelList
-    : personnelList.filter((p) => p.battery === activeBatteryTab);
+  // Category filter state
+  const [selectedCategory, setSelectedCategory] = useState<RankCategoryFilter>('ALL');
+  const [isOthersExpanded, setIsOthersExpanded] = useState<boolean>(false);
 
-  // Rank Category Counts with strict terminology
-  const officerCount = displayedPersonnel.filter((p) => ['Lt Col', 'Maj', 'Capt', 'Lt'].includes(p.rk)).length;
-  const jcoCount = displayedPersonnel.filter((p) => ['SWO', 'WO'].includes(p.rk)).length;
-  const ncoCount = displayedPersonnel.filter((p) => ['Sgt', 'Cpl', 'Lcpl'].includes(p.rk)).length;
-  const soldierCount = displayedPersonnel.filter((p) => ['Snk', 'Gnr'].includes(p.rk)).length;
+  // Switch view mode handler
+  const handleSetViewMode = (mode: 'REGT' | 'BTY') => {
+    setViewMode(mode);
+    setSelectedCategory('ALL');
+    setIsOthersExpanded(false);
+  };
+
+  // Switch battery tab handler
+  const handleSelectBattery = (bty: Battery) => {
+    setActiveBatteryTab(bty);
+    setSelectedCategory('ALL');
+    setIsOthersExpanded(false);
+  };
+
+  // Filter list depending on selected mode
+  const currentScopePersonnel = useMemo(() => {
+    return viewMode === 'REGT'
+      ? personnelList
+      : personnelList.filter((p) => p.battery === activeBatteryTab);
+  }, [viewMode, activeBatteryTab, personnelList]);
+
+  // Rank Category Counts
+  const officerCount = useMemo(
+    () => currentScopePersonnel.filter((p) => isOfficerRank(p.rk)).length,
+    [currentScopePersonnel]
+  );
+  const jcoCount = useMemo(
+    () => currentScopePersonnel.filter((p) => isJCORank(p.rk)).length,
+    [currentScopePersonnel]
+  );
+  const orCount = useMemo(
+    () => currentScopePersonnel.filter((p) => isORRank(p.rk)).length,
+    [currentScopePersonnel]
+  );
+  const civilianCount = useMemo(
+    () => currentScopePersonnel.filter((p) => isCivilianRank(p.rk, p.trade)).length,
+    [currentScopePersonnel]
+  );
+  const rcoCount = useMemo(
+    () => currentScopePersonnel.filter((p) => isRCORank(p.rk, p.trade)).length,
+    [currentScopePersonnel]
+  );
+  const othersCount = useMemo(
+    () => currentScopePersonnel.filter((p) => isCivilianRank(p.rk, p.trade) || isRCORank(p.rk, p.trade)).length,
+    [currentScopePersonnel]
+  );
+
+  // Filter displayed personnel according to selected rank category
+  const displayedPersonnel = useMemo(() => {
+    let list = currentScopePersonnel;
+    if (selectedCategory === 'OFFICER') {
+      list = list.filter((p) => isOfficerRank(p.rk));
+    } else if (selectedCategory === 'JCO') {
+      list = list.filter((p) => isJCORank(p.rk));
+    } else if (selectedCategory === 'OR') {
+      list = list.filter((p) => isORRank(p.rk));
+    } else if (selectedCategory === 'CIVILIAN') {
+      list = list.filter((p) => isCivilianRank(p.rk, p.trade));
+    } else if (selectedCategory === 'RCO') {
+      list = list.filter((p) => isRCORank(p.rk, p.trade));
+    } else if (selectedCategory === 'OTHERS') {
+      list = list.filter((p) => isCivilianRank(p.rk, p.trade) || isRCORank(p.rk, p.trade));
+    }
+    return list;
+  }, [currentScopePersonnel, selectedCategory]);
 
   return (
     <div className="space-y-6">
@@ -53,9 +122,6 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
             {viewMode === 'REGT' ? 'Regt Nominal' : `${activeBatteryTab} Nominal`}
           </h1>
-          <p className="text-xs text-slate-400">
-            10 Medium Regiment Artillery nominal roll & trade specialties.
-          </p>
         </div>
 
         {['RSM', 'Admin'].includes(currentUser.role) && (
@@ -75,7 +141,7 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
       <div className="p-2 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setViewMode('REGT')}
+            onClick={() => handleSetViewMode('REGT')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               viewMode === 'REGT'
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-950/40 border border-rose-500'
@@ -87,7 +153,7 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
           </button>
 
           <button
-            onClick={() => setViewMode('BTY')}
+            onClick={() => handleSetViewMode('BTY')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               viewMode === 'BTY'
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-950/40 border border-rose-500'
@@ -108,7 +174,7 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
               return (
                 <button
                   key={bty}
-                  onClick={() => setActiveBatteryTab(bty)}
+                  onClick={() => handleSelectBattery(bty)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
@@ -127,43 +193,224 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
       </div>
 
       {/* Rank Hierarchy Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-xl bg-slate-900 border border-rose-500/30 space-y-1">
-          <div className="flex items-center justify-between text-xs font-mono text-rose-300">
-            <span className="font-bold">Offr</span>
-            <span className="text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded text-rose-400">Lt Col - Lt</span>
+      <div
+        className={`grid gap-3 ${
+          viewMode === 'REGT' || (viewMode === 'BTY' && activeBatteryTab === 'HQ Bty')
+            ? 'grid-cols-2 sm:grid-cols-4'
+            : 'grid-cols-3'
+        }`}
+      >
+        {/* Officer Card */}
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory((prev) => (prev === 'OFFICER' ? 'ALL' : 'OFFICER'));
+            setIsOthersExpanded(false);
+          }}
+          className={`p-4 rounded-xl text-left transition-all cursor-pointer border ${
+            selectedCategory === 'OFFICER'
+              ? 'bg-rose-950/60 border-rose-500 ring-2 ring-rose-500/50 shadow-lg shadow-rose-950/50'
+              : 'bg-slate-900 border-rose-500/30 hover:border-rose-500/60 hover:bg-slate-850'
+          }`}
+        >
+          <div className="text-base sm:text-lg font-bold text-rose-300">
+            Officer
           </div>
-          <div className="text-2xl font-black text-white font-mono">{officerCount}</div>
-          <div className="text-[11px] text-slate-400 font-sans">Command & Control</div>
-        </div>
+          <div className="text-3xl sm:text-4xl font-black text-white font-mono mt-1">
+            {officerCount}
+          </div>
+        </button>
 
-        <div className="p-3.5 rounded-xl bg-slate-900 border border-amber-500/30 space-y-1">
-          <div className="flex items-center justify-between text-xs font-mono text-amber-300">
-            <span className="font-bold">JCO</span>
-            <span className="text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded text-amber-400">SWO / WO</span>
+        {/* JCO Card */}
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory((prev) => (prev === 'JCO' ? 'ALL' : 'JCO'));
+            setIsOthersExpanded(false);
+          }}
+          className={`p-4 rounded-xl text-left transition-all cursor-pointer border ${
+            selectedCategory === 'JCO'
+              ? 'bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/50 shadow-lg shadow-amber-950/50'
+              : 'bg-slate-900 border-amber-500/30 hover:border-amber-500/60 hover:bg-slate-850'
+          }`}
+        >
+          <div className="text-base sm:text-lg font-bold text-amber-300">
+            JCO
           </div>
-          <div className="text-2xl font-black text-white font-mono">{jcoCount}</div>
-          <div className="text-[11px] text-slate-400 font-sans">RSM & BSMs</div>
-        </div>
+          <div className="text-3xl sm:text-4xl font-black text-white font-mono mt-1">
+            {jcoCount}
+          </div>
+        </button>
 
-        <div className="p-3.5 rounded-xl bg-slate-900 border border-blue-500/30 space-y-1">
-          <div className="flex items-center justify-between text-xs font-mono text-blue-300">
-            <span className="font-bold">NCO</span>
-            <span className="text-[10px] bg-blue-500/10 px-1.5 py-0.5 rounded text-blue-400">Sgt - Lcpl</span>
+        {/* OR Card */}
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory((prev) => (prev === 'OR' ? 'ALL' : 'OR'));
+            setIsOthersExpanded(false);
+          }}
+          className={`p-4 rounded-xl text-left transition-all cursor-pointer border ${
+            selectedCategory === 'OR'
+              ? 'bg-blue-950/60 border-blue-500 ring-2 ring-blue-500/50 shadow-lg shadow-blue-950/50'
+              : 'bg-slate-900 border-blue-500/30 hover:border-blue-500/60 hover:bg-slate-850'
+          }`}
+        >
+          <div className="text-base sm:text-lg font-bold text-blue-300">
+            OR
           </div>
-          <div className="text-2xl font-black text-white font-mono">{ncoCount}</div>
-          <div className="text-[11px] text-slate-400 font-sans">Detachment Commanders</div>
-        </div>
+          <div className="text-3xl sm:text-4xl font-black text-white font-mono mt-1">
+            {orCount}
+          </div>
+        </button>
 
-        <div className="p-3.5 rounded-xl bg-slate-900 border border-emerald-500/30 space-y-1">
-          <div className="flex items-center justify-between text-xs font-mono text-emerald-300">
-            <span className="font-bold">Snk</span>
-            <span className="text-[10px] bg-emerald-500/10 px-1.5 py-0.5 rounded text-emerald-400">Snk / Gnr</span>
-          </div>
-          <div className="text-2xl font-black text-white font-mono">{soldierCount}</div>
-          <div className="text-[11px] text-slate-400 font-sans">Gunners & Specialists</div>
-        </div>
+        {/* Civilian Card (for Regt Nominal) */}
+        {viewMode === 'REGT' && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCategory((prev) => (prev === 'CIVILIAN' ? 'ALL' : 'CIVILIAN'));
+              setIsOthersExpanded(false);
+            }}
+            className={`p-4 rounded-xl text-left transition-all cursor-pointer border ${
+              selectedCategory === 'CIVILIAN'
+                ? 'bg-purple-950/60 border-purple-500 ring-2 ring-purple-500/50 shadow-lg shadow-purple-950/50'
+                : 'bg-slate-900 border-purple-500/30 hover:border-purple-500/60 hover:bg-slate-850'
+            }`}
+          >
+            <div className="text-base sm:text-lg font-bold text-purple-300">
+              Civilian
+            </div>
+            <div className="text-3xl sm:text-4xl font-black text-white font-mono mt-1">
+              {civilianCount}
+            </div>
+          </button>
+        )}
+
+        {/* Others Card (Only for HQ Battery) */}
+        {viewMode === 'BTY' && activeBatteryTab === 'HQ Bty' && (
+          <button
+            type="button"
+            onClick={() => {
+              const willExpand = !isOthersExpanded;
+              setIsOthersExpanded(willExpand);
+              setSelectedCategory(willExpand ? 'OTHERS' : 'ALL');
+            }}
+            className={`p-4 rounded-xl text-left transition-all cursor-pointer border ${
+              selectedCategory === 'OTHERS' || selectedCategory === 'CIVILIAN' || selectedCategory === 'RCO'
+                ? 'bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-950/50'
+                : 'bg-slate-900 border-emerald-500/30 hover:border-emerald-500/60 hover:bg-slate-850'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-base sm:text-lg font-bold text-emerald-300">
+                Others
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-emerald-400 transition-transform duration-200 ${
+                  isOthersExpanded ? 'rotate-180' : ''
+                }`}
+              />
+            </div>
+            <div className="text-3xl sm:text-4xl font-black text-white font-mono mt-1">
+              {othersCount}
+            </div>
+          </button>
+        )}
       </div>
+
+      {/* Others Sub-Categories (Civilian & RCO) for HQ Battery */}
+      {viewMode === 'BTY' && activeBatteryTab === 'HQ Bty' && isOthersExpanded && (
+        <div className="p-3.5 rounded-xl bg-slate-900 border border-emerald-500/40 flex flex-wrap items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
+              Others Category:
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('CIVILIAN')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-2 border transition-all cursor-pointer ${
+                  selectedCategory === 'CIVILIAN'
+                    ? 'bg-purple-600 text-white border-purple-400 shadow-md ring-1 ring-purple-300'
+                    : 'bg-slate-950 text-purple-300 border-purple-500/40 hover:bg-purple-950/30'
+                }`}
+              >
+                <span>Civilian (সিভিলিয়ান)</span>
+                <span className="bg-black/40 px-1.5 py-0.5 rounded text-[11px] font-mono">
+                  {civilianCount}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('RCO')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-2 border transition-all cursor-pointer ${
+                  selectedCategory === 'RCO'
+                    ? 'bg-cyan-600 text-white border-cyan-400 shadow-md ring-1 ring-cyan-300'
+                    : 'bg-slate-950 text-cyan-300 border-cyan-500/40 hover:bg-cyan-950/30'
+                }`}
+              >
+                <span>RCO (আরসিও)</span>
+                <span className="bg-black/40 px-1.5 py-0.5 rounded text-[11px] font-mono">
+                  {rcoCount}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('OTHERS')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
+                  selectedCategory === 'OTHERS'
+                    ? 'bg-emerald-600 text-white border-emerald-400 shadow-md'
+                    : 'bg-slate-950 text-emerald-300 border-emerald-500/40 hover:bg-emerald-950/30'
+                }`}
+              >
+                <span>All Others ({othersCount})</span>
+              </button>
+            </div>
+          </div>
+          {selectedCategory !== 'ALL' && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('ALL');
+                setIsOthersExpanded(false);
+              }}
+              className="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+            >
+              Show All
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Active Filter Indicator if user clicked a card */}
+      {selectedCategory !== 'ALL' && !isOthersExpanded && (
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-slate-900/90 border border-slate-800 text-xs">
+          <span className="text-slate-300">
+            Filtered by:{' '}
+            <strong className="text-white font-mono font-bold">
+              {selectedCategory === 'OFFICER'
+                ? 'Officer'
+                : selectedCategory === 'JCO'
+                ? 'JCO'
+                : selectedCategory === 'OR'
+                ? 'OR (Other Ranks)'
+                : selectedCategory === 'CIVILIAN'
+                ? 'Civilian'
+                : selectedCategory === 'RCO'
+                ? 'RCO'
+                : selectedCategory}
+            </strong>{' '}
+            ({displayedPersonnel.length} personnel)
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedCategory('ALL')}
+            className="text-rose-400 hover:text-rose-300 font-semibold underline cursor-pointer"
+          >
+            Show All
+          </button>
+        </div>
+      )}
 
       {/* Main Personnel Table Component */}
       <PersonnelTable
@@ -172,7 +419,15 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
         onViewDossier={onViewDossier}
         onOpenAddModal={onOpenAddModal}
         allowStatusEdits={currentUser.role !== 'CO'}
-        title={viewMode === 'REGT' ? 'Regt Nominal' : `${activeBatteryTab} Nominal`}
+        title={
+          viewMode === 'REGT'
+            ? selectedCategory !== 'ALL'
+              ? `Regt Nominal (${selectedCategory})`
+              : 'Regt Nominal'
+            : selectedCategory !== 'ALL'
+            ? `${activeBatteryTab} Nominal (${selectedCategory})`
+            : `${activeBatteryTab} Nominal`
+        }
       />
     </div>
   );

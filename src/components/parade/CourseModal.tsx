@@ -78,9 +78,6 @@ export const CourseModal: React.FC<CourseModalProps> = ({
                   {coursePersonnel.length} Soldiers On Course
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono">
-                10 Med Regt Arty Officers & Other Ranks attending professional gunnery & technical courses
-              </p>
             </div>
           </div>
 
@@ -142,9 +139,6 @@ export const CourseModal: React.FC<CourseModalProps> = ({
             <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/80">
               <GraduationCap className="w-10 h-10 text-slate-600 mx-auto mb-2" />
               <p className="text-sm font-semibold text-slate-300">No personnel currently attending courses</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Try clearing search filter or switching battery selection.
-              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">

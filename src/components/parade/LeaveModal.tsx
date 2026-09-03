@@ -198,9 +198,6 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
             <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/80">
               <PlaneTakeoff className="w-10 h-10 text-slate-600 mx-auto mb-2" />
               <p className="text-sm font-semibold text-slate-300">No personnel found on leave</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Try switching between P/Lve or C/Lve filters or changing battery selection.
-              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">

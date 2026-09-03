@@ -95,9 +95,6 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
             <h1 className="text-2xl font-bold text-white tracking-tight font-sans mt-1">
               RSM Consolidated Muster & Parade State Dashboard
             </h1>
-            <p className="text-xs text-slate-400 font-mono">
-              Full Regiment Status Verification, Battery Confirmation, and Guards Roster.
-            </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">

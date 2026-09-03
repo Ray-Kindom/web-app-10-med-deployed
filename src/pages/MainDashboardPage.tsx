@@ -97,8 +97,8 @@ export const MainDashboardPage: React.FC<MainDashboardPageProps> = ({
             <h1 className="text-xl sm:text-2xl font-bold text-white font-sans tracking-tight">
               Regimental Command Dashboard
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Welcome, <span className="text-white font-semibold">{currentUser.rank} {currentUser.name}</span> ({currentUser.role}). Real-time personnel strength, muster roll, and readiness metrics.
+            <p className="text-xs text-slate-400">
+              <span className="text-white font-semibold">{currentUser.rank} {currentUser.name}</span> ({currentUser.role})
             </p>
           </div>
 

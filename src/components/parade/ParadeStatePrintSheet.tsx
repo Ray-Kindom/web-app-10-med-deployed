@@ -34,14 +34,9 @@ export const ParadeStatePrintSheet: React.FC<ParadeStatePrintSheetProps> = ({
         <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2">
             <Printer className="w-5 h-5 text-rose-500" />
-            <div>
-              <h3 className="text-sm font-bold text-white">
-                Official Military Morning Parade State Document
-              </h3>
-              <p className="text-[11px] text-slate-400 font-mono">
-                10 Medium Regiment Artillery — Formatted for Command Record
-              </p>
-            </div>
+            <h3 className="text-sm font-bold text-white">
+              Official Military Morning Parade State Document
+            </h3>
           </div>
 
           <div className="flex items-center gap-2">

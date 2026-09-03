@@ -248,10 +248,7 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="relative w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div>
-                <h3 className="text-base font-bold text-white">Create New Parade State Type</h3>
-                <p className="text-xs text-slate-400 font-mono">RSM Only • Dynamic Configuration</p>
-              </div>
+              <h3 className="text-base font-bold text-white">Create New Parade State Type</h3>
               <button
                 onClick={() => setIsAddTypeModalOpen(false)}
                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"

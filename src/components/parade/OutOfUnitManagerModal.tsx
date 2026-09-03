@@ -572,9 +572,6 @@ export const OutOfUnitManagerModal: React.FC<OutOfUnitManagerModalProps> = ({
                         <p className="text-sm font-medium text-slate-400">
                           No personnel currently assigned to [{currentCategory}] in {selectedBattery === 'All' ? 'the regiment' : selectedBattery}.
                         </p>
-                        <p className="text-xs text-slate-500">
-                          Click "Add Soldier to {currentCategory}" above to assign personnel.
-                        </p>
                       </div>
                     </td>
                   </tr>
