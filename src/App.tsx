@@ -160,6 +160,7 @@ const AppContent: React.FC = () => {
       <DailyParadeStateModal
         isOpen={dailyParadeModalOpen}
         onClose={() => setDailyParadeModalOpen(false)}
+        onOpenPrintModal={() => setIsPrintModalOpen(true)}
       />
 
       {/* Updt Out Of Unit Modal (ERE, Msn, Att, FDMN, CMH, Course, Comd, Leaves) */}

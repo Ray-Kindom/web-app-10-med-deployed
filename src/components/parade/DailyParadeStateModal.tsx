@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { useApp } from '../../context/AppContext';
 import {
   DailyParadePoint,
@@ -22,6 +23,9 @@ import {
   EyeOff,
   Filter,
   Check,
+  Printer,
+  Download,
+  Clock,
 } from 'lucide-react';
 
 interface DailyParadeStateModalProps {
@@ -30,6 +34,7 @@ interface DailyParadeStateModalProps {
   defaultBattery?: Battery;
   sessionType?: string; // Morning, Second Period, Games, Roll Call
   date?: string; // YYYY-MM-DD
+  onOpenPrintModal?: () => void;
 }
 
 export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
@@ -38,6 +43,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
   defaultBattery,
   sessionType = 'Morning',
   date,
+  onOpenPrintModal,
 }) => {
   const {
     dailyParadePoints,
@@ -49,6 +55,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     currentUser,
     showNotification,
     selectedParadeDate,
+    setSelectedParadeDate,
     getParadeRecord,
     saveParadeRecordCounts,
     confirmBatteryParadeRecord,
@@ -229,23 +236,113 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     };
   }, [visiblePoints, activeTab]);
 
+  const handleDownloadState = () => {
+    try {
+      const rows: (string | number)[][] = [];
+      rows.push(['10 MEDIUM REGIMENT ARTILLERY']);
+      rows.push([`${sessionType.toUpperCase()} PARADE STATE - ${activeDate}`]);
+      rows.push([`Generated on: ${new Date().toLocaleString()}`]);
+      rows.push([]);
+      rows.push([
+        'SL',
+        'Parade State / Duty Point',
+        'HQ Offr',
+        'HQ JCO',
+        'HQ OR',
+        'HQ Total',
+        'P Offr',
+        'P JCO',
+        'P OR',
+        'P Total',
+        'Q Offr',
+        'Q JCO',
+        'Q OR',
+        'Q Total',
+        'R Offr',
+        'R JCO',
+        'R OR',
+        'R Total',
+        'Regt Offr',
+        'Regt JCO',
+        'Regt OR',
+        'Grand Total',
+      ]);
+
+      visiblePoints.forEach((pt, idx) => {
+        const hq = countsBuffer[pt.id]?.['HQ Bty'] || { offr: 0, jco: 0, or: 0 };
+        const p = countsBuffer[pt.id]?.['P Bty'] || { offr: 0, jco: 0, or: 0 };
+        const q = countsBuffer[pt.id]?.['Q Bty'] || { offr: 0, jco: 0, or: 0 };
+        const r = countsBuffer[pt.id]?.['R Bty'] || { offr: 0, jco: 0, or: 0 };
+
+        const hqTot = (hq.offr || 0) + (hq.jco || 0) + (hq.or || 0);
+        const pTot = (p.offr || 0) + (p.jco || 0) + (p.or || 0);
+        const qTot = (q.offr || 0) + (q.jco || 0) + (q.or || 0);
+        const rTot = (r.offr || 0) + (r.jco || 0) + (r.or || 0);
+
+        const offrTot = (hq.offr || 0) + (p.offr || 0) + (q.offr || 0) + (r.offr || 0);
+        const jcoTot = (hq.jco || 0) + (p.jco || 0) + (q.jco || 0) + (r.jco || 0);
+        const orTot = (hq.or || 0) + (p.or || 0) + (q.or || 0) + (r.or || 0);
+        const grandTot = offrTot + jcoTot + orTot;
+
+        rows.push([
+          idx + 1,
+          pt.name,
+          hq.offr || 0,
+          hq.jco || 0,
+          hq.or || 0,
+          hqTot,
+          p.offr || 0,
+          p.jco || 0,
+          p.or || 0,
+          pTot,
+          q.offr || 0,
+          q.jco || 0,
+          q.or || 0,
+          qTot,
+          r.offr || 0,
+          r.jco || 0,
+          r.or || 0,
+          rTot,
+          offrTot,
+          jcoTot,
+          orTot,
+          grandTot,
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `${sessionType} State`);
+      XLSX.writeFile(wb, `10_Med_Regt_${sessionType}_Parade_State_${activeDate}.xlsx`);
+      showNotification(`${sessionType} Parade State downloaded successfully!`);
+    } catch (err) {
+      console.error('Download error:', err);
+      showNotification('Failed to export state.');
+    }
+  };
+
+  const handlePrintState = () => {
+    if (onOpenPrintModal) {
+      onOpenPrintModal();
+    } else {
+      window.print();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
       <div className="relative w-full max-w-6xl bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-3.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 shrink-0">
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-lg font-bold text-white tracking-wide">
                   {sessionType} Parade State
                 </h3>
-                <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-slate-800 text-rose-300 border border-rose-500/30">
-                  📅 {activeDate}
-                </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   {isBsm ? `${activeTab} View` : 'Regimental Overview'}
                 </span>
@@ -255,12 +352,56 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Date Selector Inside Session Sheet */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-inner">
+              <Clock className="w-3.5 h-3.5 text-rose-400" />
+              <span className="text-xs text-slate-400 font-mono font-bold">Date:</span>
+              <input
+                type="date"
+                value={activeDate}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedParadeDate(e.target.value);
+                    showNotification(`Date changed to ${e.target.value}`);
+                  }
+                }}
+                className="bg-transparent text-white font-mono font-bold text-xs focus:outline-none cursor-pointer"
+              />
+            </div>
+
+            {/* Download State Button */}
+            <button
+              onClick={handleDownloadState}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all cursor-pointer shadow-sm hover:border-emerald-500/50"
+              title="Download Parade State Excel Sheet"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Download State</span>
+              <span className="sm:hidden">Download</span>
+            </button>
+
+            {/* Print State Button */}
+            <button
+              onClick={handlePrintState}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950/40 transition-all cursor-pointer"
+              title="Print Official Parade State Sheet"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Print State</span>
+              <span className="sm:hidden">Print</span>
+            </button>
+
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer ml-1"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Selection & Control Bar */}

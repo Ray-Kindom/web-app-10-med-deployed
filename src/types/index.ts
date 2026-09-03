@@ -178,6 +178,7 @@ export interface DailyParadePoint {
     'Q Bty': ParadePointCount;
     'R Bty': ParadePointCount;
   };
+  rsmSuggested?: ParadePointCount;
 }
 
 export type ParadeSessionType = 'Morning' | 'Second Period' | 'Games' | 'Roll Call' | string;
