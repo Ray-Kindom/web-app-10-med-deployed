@@ -22,6 +22,7 @@ import {
   CalculationConfig,
   RankCategory,
   isOfficerRank,
+  isBsmRole,
 } from '../types';
 import {
   INITIAL_PERSONNEL,
@@ -50,6 +51,8 @@ import {
   onSnapshot,
   onAuthStateChanged,
   FirebaseUser,
+  handleFirestoreError,
+  OperationType,
 } from '../lib/firebase';
 
 interface AppContextType {
@@ -489,16 +492,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [outOfUnitModalOpen, setOutOfUnitModalOpen] = useState<boolean>(false);
   const [activeOutOfUnitCategory, setActiveOutOfUnitCategory] = useState<OutOfUnitCategory>('Msn');
 
-  // Safe helper to sync to Firestore without throwing noisy unhandled console exceptions when in local/offline mode or unauthenticated
+  // Safe helper to sync to Firestore with structured error handling per SKILL.md
   const syncDoc = (promiseOrFn: (() => Promise<any>) | Promise<any>, description?: string) => {
     if (!auth.currentUser) return;
     try {
       const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
       p?.catch?.((err: any) => {
-        console.warn(`[Firestore sync notice - ${description || 'operation'}]:`, err?.message || err);
+        try {
+          handleFirestoreError(err, OperationType.WRITE, description || null);
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
       });
     } catch (e: any) {
-      console.warn(`[Firestore sync notice - ${description || 'operation'}]:`, e?.message || e);
+      try {
+        handleFirestoreError(e, OperationType.WRITE, description || null);
+      } catch {
+        // Handled and logged with full FirestoreErrorInfo
+      }
     }
   };
 
@@ -808,6 +819,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showNotification('গেস্ট মোডে নতুন প্যারেড টাইপ তৈরি করা যাবে না (GUEST — VIEW ONLY)।');
       return;
     }
+    if (isBsmRole(currentUser.role)) {
+      showNotification('Permission Denied: BSM cannot create new Parade State types. Only RSM or Admin can create parade types.');
+      addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (BSM) attempted to create parade type`, 'SECURITY');
+      return;
+    }
     const isRsm = currentUser.role === 'RSM';
     if (!isAdmin && !isRsm) {
       showNotification('Permission Denied: Only ADMIN or RSM has permission to create new Parade State types.');
@@ -860,6 +876,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showNotification('গেস্ট মোডে প্যারেড টাইপ সম্পাদনা করা যাবে না (GUEST — VIEW ONLY)।');
       return false;
     }
+    if (isBsmRole(currentUser.role)) {
+      showNotification('Permission Denied: BSM cannot modify Parade State types.');
+      return false;
+    }
     if (!isAdmin) {
       showNotification('Permission Denied: Only ADMIN has permission to modify Parade State types.');
       addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (${currentUser.role}) attempted to edit parade type`, 'SECURITY');
@@ -877,6 +897,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteParadeType = (id: string): boolean => {
     if (isGuest) {
       showNotification('গেস্ট মোডে প্যারেড টাইপ মুছে ফেলা যাবে না (GUEST — VIEW ONLY)।');
+      return false;
+    }
+    if (isBsmRole(currentUser.role)) {
+      showNotification('Permission Denied: BSM cannot delete Parade State types. Only Admin or RSM can delete parade types.');
+      addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (BSM) attempted to delete parade type`, 'SECURITY');
       return false;
     }
     const targetType = paradeTypes.find((t) => t.id === id || t.name === id);
@@ -1413,7 +1438,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore users listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'users');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 2. /personnel listener
@@ -1431,7 +1462,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setPersonnelList(INITIAL_PERSONNEL);
         }
       },
-      (err) => console.warn('Firestore personnel listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'personnel');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 3. /parade_points listener
@@ -1449,7 +1486,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore parade points listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'parade_points');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 4. /duty_roster listener
@@ -1465,7 +1508,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore duty roster listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'duty_roster');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 5. /audit_logs listener (strictly ordered by timestamp)
@@ -1483,7 +1532,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore audit logs listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'audit_logs');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 6. /settings/regiment_settings listener
@@ -1497,7 +1552,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       },
-      (err) => console.warn('Firestore settings listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'settings/regiment_settings');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 7. /parade_types listener
@@ -1533,7 +1594,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore parade types notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'parade_types');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 8. /parade_records listener
@@ -1549,7 +1616,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           localStorage.setItem(STORAGE_KEYS.PARADE_RECORDS, JSON.stringify(map));
         }
       },
-      (err) => console.warn('Firestore parade records notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'parade_records');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 9. /system_categories listener (Dynamic Categories & Sub-categories)
@@ -1568,7 +1641,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore categories listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'system_categories');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 10. /sub_units listener
@@ -1587,7 +1666,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore sub_units listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'sub_units');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 11. /military_ranks listener
@@ -1606,7 +1691,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore military_ranks listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'military_ranks');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 12. /auth_establishment listener
@@ -1623,7 +1714,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => console.warn('Firestore auth_establishment listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'auth_establishment');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     // 13. /calculation_config listener
@@ -1644,7 +1741,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           );
         }
       },
-      (err) => console.warn('Firestore calculation_config listener notice:', err?.message || err)
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'calculation_config');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
     );
 
     return () => {
@@ -1734,13 +1837,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEYS.AUTH_STATUS, 'true');
 
     // Route to designated dashboard based on role
-    if (user.role === 'CO' || user.role === 'Offr') {
-      setActivePage('main_dashboard');
+    if (user.role === 'CO') {
+      setActivePage('co_dashboard');
+    } else if (user.role === 'Offr') {
+      setActivePage('offr_dashboard');
     } else if (user.role === 'RSM') {
       setActivePage('rsm_dashboard');
     } else if (user.role === 'Admin') {
       setActivePage('admin_panel');
-    } else if (['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(user.role)) {
+    } else if (isBsmRole(user.role)) {
       const bty =
         user.assignedBattery ||
         (user.role === 'P BSM'
@@ -1749,7 +1854,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ? 'Q Bty'
           : user.role === 'R BSM'
           ? 'R Bty'
-          : 'HQ Bty');
+          : user.role === 'HQ BSM'
+          ? 'HQ Bty'
+          : 'P Bty');
       setSelectedBatteryFilter(bty);
       setActivePage('battery_dashboard');
     } else {
@@ -1843,30 +1950,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showNotification('শুধুমাত্র এডমিন এবং গেস্ট সিমুলেটর ব্যবহার করতে পারেন।');
       return;
     }
-    const matchingUser = usersList.find((u) => u.role === role) || INITIAL_USERS.find((u) => u.role === role);
+    const matchingUser =
+      usersList.find((u) => u.role === role) ||
+      INITIAL_USERS.find((u) => u.role === role) ||
+      (isBsmRole(role)
+        ? usersList.find((u) => isBsmRole(u.role)) || INITIAL_USERS.find((u) => isBsmRole(u.role))
+        : null);
     if (matchingUser) {
       let defaultBty: Battery | undefined = battery || matchingUser.assignedBattery;
       if (!defaultBty) {
-        if (role === 'P BSM') defaultBty = 'P Bty';
+        if (role === 'P BSM' || role === 'BSM') defaultBty = 'P Bty';
         else if (role === 'Q BSM') defaultBty = 'Q Bty';
         else if (role === 'R BSM') defaultBty = 'R Bty';
         else if (role === 'HQ BSM') defaultBty = 'HQ Bty';
       }
       const updatedUser: UserAccount = {
         ...matchingUser,
+        role,
         assignedBattery: defaultBty,
       };
       setCurrentUserState(updatedUser);
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
 
       // Auto-route to corresponding role dashboard
-      if (role === 'CO' || role === 'Offr') {
-        setActivePage('main_dashboard');
+      if (role === 'CO') {
+        setActivePage('co_dashboard');
+      } else if (role === 'Offr') {
+        setActivePage('offr_dashboard');
       } else if (role === 'RSM') {
         setActivePage('rsm_dashboard');
       } else if (role === 'Admin') {
         setActivePage('admin_panel');
-      } else if (['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(role)) {
+      } else if (isBsmRole(role)) {
         if (defaultBty) setSelectedBatteryFilter(defaultBty);
         setActivePage('battery_dashboard');
       } else {

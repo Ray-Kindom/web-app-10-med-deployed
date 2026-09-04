@@ -8,6 +8,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import {
+  initializeFirestore,
   getFirestore,
   doc,
   getDocFromServer,
@@ -37,28 +38,52 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Initialize Firestore targeting the configured database ID
-export const db =
+// Uses experimentalForceLongPolling to prevent 10-second backend timeout in browser sandbox/proxy environments
+const targetDatabaseId =
   firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-    : getFirestore(app);
+    ? firebaseConfig.firestoreDatabaseId
+    : undefined;
 
-// Connectivity check as per Firebase guidelines
-export const testFirestoreConnection = async (): Promise<boolean> => {
+let firestoreInstance;
+try {
+  firestoreInstance = initializeFirestore(
+    app,
+    {
+      experimentalForceLongPolling: true,
+    },
+    targetDatabaseId
+  );
+} catch {
+  firestoreInstance = targetDatabaseId ? getFirestore(app, targetDatabaseId) : getFirestore(app);
+}
+
+export const db = firestoreInstance;
+
+// Validate connection to Firestore as mandated by SKILL.md
+export async function testConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
     return true;
   } catch (error: any) {
-    if (error?.message?.includes('the client is offline') || error?.code === 'unavailable') {
-      console.warn('[Firebase] Firestore offline or network unreachable, using local fallback cache.');
+    if (
+      error instanceof Error &&
+      (error.message.includes('the client is offline') ||
+        (error as any).code === 'unavailable' ||
+        error.message.includes('unavailable'))
+    ) {
+      console.warn('Firestore connectivity notice: client operating in local cache mode.');
       return false;
     }
-    // Connected (even permission-denied or document-not-found means endpoint is reached)
+    // Any other response (such as document not found or permission check) means endpoint is reachable
     return true;
   }
-};
+}
+
+// Export alias for backward compatibility
+export const testFirestoreConnection = testConnection;
 
 // Test connection on boot
-testFirestoreConnection().catch((err) => {
+testConnection().catch((err) => {
   console.warn('[Firebase] Initial connection check:', err?.message || err);
 });
 
@@ -108,7 +133,7 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): FirestoreErrorInfo {
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -125,8 +150,8 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.warn('Firestore Operation Notice: ', JSON.stringify(errInfo));
-  return errInfo;
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 }
 
 export {

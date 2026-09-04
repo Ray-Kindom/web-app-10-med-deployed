@@ -2,12 +2,18 @@ export type Role =
   | 'CO'
   | 'Offr'
   | 'RSM'
+  | 'BSM'
   | 'P BSM'
   | 'Q BSM'
   | 'R BSM'
   | 'HQ BSM'
   | 'Admin'
   | 'Guest';
+
+export const isBsmRole = (role?: string): boolean => {
+  if (!role) return false;
+  return role === 'BSM' || role.endsWith('BSM');
+};
 
 export const OFFICER_RANKS: string[] = ['Lt Col', 'Maj', 'Capt', 'Lt', '2Lt'];
 

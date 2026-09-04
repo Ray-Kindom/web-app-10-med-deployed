@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserAccount, Role, Battery, isOfficerRank } from '../../types';
+import { UserAccount, Role, Battery, isOfficerRank, isBsmRole } from '../../types';
 import { useApp } from '../../context/AppContext';
 import {
   X,
@@ -11,6 +11,7 @@ import {
   Building2,
   Check,
   AlertTriangle,
+  AlertCircle,
   Edit,
   Eye,
   EyeOff,

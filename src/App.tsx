@@ -18,6 +18,7 @@ import { BatteryDashboardPage } from './pages/BatteryDashboardPage';
 import { ParadeStatePage } from './pages/ParadeStatePage';
 import { RsmDashboardPage } from './pages/RsmDashboardPage';
 import { CoDashboardPage } from './pages/CoDashboardPage';
+import { OffrDashboardPage } from './pages/OffrDashboardPage';
 import { AdminPanelPage } from './pages/AdminPanelPage';
 
 const AppContent: React.FC = () => {
@@ -91,6 +92,14 @@ const AppContent: React.FC = () => {
         return (
           <CoDashboardPage
             onViewDossier={handleViewDossier}
+            onOpenPrintModal={() => setIsPrintModalOpen(true)}
+          />
+        );
+      case 'offr_dashboard':
+        return (
+          <OffrDashboardPage
+            onViewDossier={handleViewDossier}
+            onOpenAddModal={() => setIsAddModalOpen(true)}
             onOpenPrintModal={() => setIsPrintModalOpen(true)}
           />
         );
