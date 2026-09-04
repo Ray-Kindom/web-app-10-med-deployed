@@ -35,7 +35,7 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
   allowStatusEdits = true,
   title,
 }) => {
-  const { updateParadeStatus, currentUser, showNotification, searchQuery, setSearchQuery } = useApp();
+  const { updateParadeStatus, currentUser, showNotification, searchQuery, setSearchQuery, isGuest } = useApp();
 
   // Filter States - synced with header search query
   const [localSearchTerm, setLocalSearchTerm] = useState('');
@@ -292,7 +292,7 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
             </div>
 
             {/* Enlist Soldier (RSM Role) */}
-            {currentUser.role === 'RSM' && onOpenAddModal && (
+            {currentUser.role === 'RSM' && !isGuest && onOpenAddModal && (
               <button
                 onClick={onOpenAddModal}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-900/40 transition-colors"
@@ -536,7 +536,7 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
                       ) : (
                         <div className="flex items-center justify-between gap-2">
                           <StatusBadge status={person.status} size="sm" />
-                          {allowStatusEdits && currentUser.role !== 'CO' && (
+                          {allowStatusEdits && currentUser.role !== 'CO' && !isGuest && (
                             <button
                               onClick={() => setActiveEditingId(person.id)}
                               title="Update Parade State"

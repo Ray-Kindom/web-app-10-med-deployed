@@ -22,7 +22,7 @@ service cloud.firestore {
     // Explicitly authorizes application owner backupray12145@gmail.com, bootstrapped admin accounts, and users with Admin role
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email in ['10medclk@gmail.com', 'mdraiyan1512@gmail.com', 'backupray12145@gmail.com'] ||
+        request.auth.token.email in ['10medclk@gmail.com', 'mdraiyan1512@gmail.com', 'backupray12145@gmail.com', '10medcanteen@gmail.com'] ||
         getUserRole() == 'Admin' ||
         request.auth.token.email != null
       );

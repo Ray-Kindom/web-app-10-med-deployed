@@ -32,6 +32,7 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
     setSelectedBatteryFilter,
     showNotification,
     addAuditLog,
+    isGuest,
   } = useApp();
 
   const [activeBattery, setActiveBattery] = useState<Battery>(
@@ -93,7 +94,7 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
 
   const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
   const isRsm = currentUser.role === 'RSM' || currentUser.role === 'Admin';
-  const canManageOutOfUnit = isBsm || isRsm;
+  const canManageOutOfUnit = !isGuest && (isBsm || isRsm);
 
   // Personnel for popup modal
   const modalPersonnel = selectedStatFilter

@@ -28,6 +28,7 @@ import {
   INITIAL_USERS,
   INITIAL_DUTY_ROSTER,
   INITIAL_AUDIT_LOGS,
+  GUEST_USER,
 } from '../data/initialData';
 import { INITIAL_PARADE_POINTS } from '../data/paradePointsData';
 import {
@@ -57,6 +58,7 @@ interface AppContextType {
   switchRole: (role: Role, battery?: Battery) => void;
   isAdmin: boolean;
   isRSM: boolean;
+  isGuest: boolean;
   usersList: UserAccount[];
   addUser: (user: Omit<UserAccount, 'id'>) => void;
   updateUser: (id: string, updated: Partial<UserAccount>) => void;
@@ -278,7 +280,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (savedUser) {
       try {
         const u = JSON.parse(savedUser);
-        if (u && (u.role === 'Admin' || u.email === '10medclk@gmail.com' || u.username === 'admin')) {
+        if (
+          u &&
+          (u.role === 'Admin' ||
+            u.email === '10medclk@gmail.com' ||
+            u.username?.toLowerCase() === 'admin' ||
+            u.role === 'Guest' ||
+            u.username?.toLowerCase() === 'guest')
+        ) {
           return u;
         }
       } catch (e) {}
@@ -342,8 +351,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   // Role permissions & Simulation State
-  // isRealAdmin stays true for the logged-in Administrator regardless of simulated role
-  const isRealAdmin = Boolean(
+  // Guest Demo Mode - Completely Read-Only
+  const isGuest = Boolean(
+    currentUser.role === 'Guest' ||
+    realUser?.role === 'Guest' ||
+    currentUser.username?.toLowerCase() === 'guest' ||
+    realUser?.username?.toLowerCase() === 'guest'
+  );
+
+  // isRealAdmin stays true for the genuine logged-in Administrator regardless of simulated role
+  const isRealAdmin = !isGuest && Boolean(
     realUser?.role === 'Admin' ||
     realUser?.email === '10medclk@gmail.com' ||
     realUser?.email === 'mdraiyan1512@gmail.com' ||
@@ -355,12 +372,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (!realUser && currentUser.role === 'Admin')
   );
 
-  // Active when a genuine Admin is currently simulating another role (e.g. CO, RSM, BSM)
+  // Active when a genuine Admin or Guest is currently simulating another role
   const isSimulating = Boolean(
-    isRealAdmin && (currentUser.role !== 'Admin' || (realUser && currentUser.id !== realUser.id))
+    (isRealAdmin && (currentUser.role !== 'Admin' || (realUser && currentUser.id !== realUser.id))) ||
+    (isGuest && currentUser.id !== GUEST_USER.id)
   );
 
   const exitSimulation = () => {
+    if (isGuest) {
+      setCurrentUserState(GUEST_USER);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(GUEST_USER));
+      setActivePage('main_dashboard');
+      showNotification('GUEST — VIEW ONLY: মূল ড্যাশবোর্ডে ফিরে আসা হয়েছে।');
+      return;
+    }
     if (!isRealAdmin) return;
     const adminUser = realUser || usersList.find((u) => u.role === 'Admin') || INITIAL_USERS.find((u) => u.role === 'Admin');
     if (adminUser) {
@@ -373,12 +398,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const isAdmin =
-    currentUser.role === 'Admin' ||
-    currentUser.email === '10medclk@gmail.com' ||
-    currentUser.email === 'mdraiyan1512@gmail.com' ||
-    currentUser.email === 'backupray12145@gmail.com' ||
-    isRealAdmin;
-  const isRSM = currentUser.role === 'RSM';
+    !isGuest &&
+    (currentUser.role === 'Admin' ||
+      currentUser.email === '10medclk@gmail.com' ||
+      currentUser.email === 'mdraiyan1512@gmail.com' ||
+      currentUser.email === 'backupray12145@gmail.com' ||
+      isRealAdmin);
+  const isRSM = !isGuest && currentUser.role === 'RSM';
 
 
   const [personnelList, setPersonnelList] = useState<Personnel[]>(() => {
@@ -495,6 +521,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const setBatteryParadeStatus = (battery: Battery, status: 'Pending' | 'Confirmed') => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে কোনো ব্যাটারি প্যারেড স্ট্যাটাস পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const dateStr = `${String(now.getDate()).padStart(2, '0')} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()]}`;
@@ -606,6 +636,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     counts: Record<string, ParadePointCount>,
     submitStatus?: ParadeRecordStatus
   ) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে কোনো প্যারেড স্টেট পরিবর্তন বা সংরক্ষণ করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const isOfficerOrCo =
       currentUser.role === 'CO' ||
       currentUser.role === 'Offr' ||
@@ -668,6 +702,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const confirmBatteryParadeRecord = (date: string, typeId: string, battery: Battery) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে কোনো প্যারেড স্টেট কনফার্ম করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const isOfficerOrCo =
       currentUser.role === 'CO' ||
       currentUser.role === 'Offr' ||
@@ -713,6 +751,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const finalizeParadeType = (date: string, typeId: string) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে কোনো প্যারেড স্টেট ফাইনাল করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const isOfficerOrCo =
       currentUser.role === 'CO' ||
       currentUser.role === 'Offr' ||
@@ -762,6 +804,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addParadeType = (name: string, headings?: string[]) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে নতুন প্যারেড টাইপ তৈরি করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const isRsm = currentUser.role === 'RSM';
     if (!isAdmin && !isRsm) {
       showNotification('Permission Denied: Only ADMIN or RSM has permission to create new Parade State types.');
@@ -810,6 +856,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateParadeType = (id: string, updated: Partial<ParadeTypeDefinition>): boolean => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে প্যারেড টাইপ সম্পাদনা করা যাবে না (GUEST — VIEW ONLY)।');
+      return false;
+    }
     if (!isAdmin) {
       showNotification('Permission Denied: Only ADMIN has permission to modify Parade State types.');
       addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (${currentUser.role}) attempted to edit parade type`, 'SECURITY');
@@ -825,6 +875,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteParadeType = (id: string): boolean => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে প্যারেড টাইপ মুছে ফেলা যাবে না (GUEST — VIEW ONLY)।');
+      return false;
+    }
     const targetType = paradeTypes.find((t) => t.id === id || t.name === id);
     if (!targetType) return false;
 
@@ -887,6 +941,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const restoreParadeType = (id: string): boolean => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে প্যারেড টাইপ পুনরুদ্ধার করা যাবে না (GUEST — VIEW ONLY)।');
+      return false;
+    }
     if (!isAdmin) {
       showNotification('Permission Denied: Only ADMIN can restore archived Parade States.');
       return false;
@@ -1643,6 +1701,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Look up user by username (case-insensitive)
     const user =
+      (cleanU === 'guest' ? GUEST_USER : null) ||
       usersList.find((u) => u.username.toLowerCase() === cleanU) ||
       INITIAL_USERS.find((u) => u.username.toLowerCase() === cleanU);
 
@@ -1650,11 +1709,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'ভুল ইউজারনেম! এই ইউজারনেমে কোনো অ্যাকাউন্ট পাওয়া যায়নি।' };
     }
 
-    // Password verification: Admin default is admin123 if not set; other users require password set
+    // Password verification: Admin default is admin123; Guest default is guest123
     let validPassword = user.password;
     if (!validPassword) {
       if (user.role === 'Admin' || user.username.toLowerCase() === 'admin') {
         validPassword = 'admin123';
+      } else if (user.role === 'Guest' || user.username.toLowerCase() === 'guest') {
+        validPassword = 'guest123';
       } else {
         return { success: false, error: 'এই ব্যবহারকারীর জন্য পাসওয়ার্ড এখনও সেট করা হয়নি! অনুগ্রহ করে অ্যাডমিনের সাথে যোগাযোগ করুন।' };
       }
@@ -1778,8 +1839,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const switchRole = (role: Role, battery?: Battery) => {
-    if (!isRealAdmin) {
-      showNotification('শুধুমাত্র এডমিন সিমুলেটর ব্যবহার করতে পারেন।');
+    if (!isRealAdmin && !isGuest) {
+      showNotification('শুধুমাত্র এডমিন এবং গেস্ট সিমুলেটর ব্যবহার করতে পারেন।');
       return;
     }
     const matchingUser = usersList.find((u) => u.role === role) || INITIAL_USERS.find((u) => u.role === role);
@@ -1813,13 +1874,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       showNotification(
-        `সিমুলেশন মোড: সক্রিয় রোল পরিবর্তিত হয়েছে ${role}${updatedUser.assignedBattery ? ` (${updatedUser.assignedBattery})` : ''}`
+        isGuest
+          ? `GUEST — VIEW ONLY: রোল সিমুলেশন পরিবর্তিত হয়েছে ${role}${updatedUser.assignedBattery ? ` (${updatedUser.assignedBattery})` : ''}`
+          : `সিমুলেশন মোড: সক্রিয় রোল পরিবর্তিত হয়েছে ${role}${updatedUser.assignedBattery ? ` (${updatedUser.assignedBattery})` : ''}`
       );
-      addAuditLog('Role Switch', `Admin switched simulation view mode to ${role}`, 'SECURITY');
+      if (!isGuest) {
+        addAuditLog('Role Switch', `Admin switched simulation view mode to ${role}`, 'SECURITY');
+      }
     }
   };
 
   const addUser = (user: Omit<UserAccount, 'id'>) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে নতুন ইউজার যোগ করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const newId = 'u-' + Date.now();
     const newUser: UserAccount = {
       ...user,
@@ -1842,6 +1911,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateUser = (id: string, updated: Partial<UserAccount>) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে ইউজার তথ্য পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     let finalUpdated: UserAccount | null = null;
     setUsersList((prev) =>
       prev.map((u) => {
@@ -1864,6 +1937,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteUser = (id: string) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে ইউজার মুছে ফেলা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const target = usersList.find((u) => u.id === id);
     if (!target) return;
     if (target.id === currentUser.id) {
@@ -1878,6 +1955,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addPersonnel = (person: Omit<Personnel, 'id'>) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে নতুন সৈন্য অন্তর্ভুক্তি করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const newId = (personnelList.length + 1).toString();
     const newPerson: Personnel = { ...person, id: newId };
     setPersonnelList((prev) => [newPerson, ...prev]);
@@ -1892,6 +1973,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePersonnel = (id: string, updated: Partial<Personnel>) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে সৈন্যের তথ্য পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     let updatedRecord: Personnel | null = null;
     setPersonnelList((prev) =>
       prev.map((p) => {
@@ -1911,6 +1996,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deletePersonnel = (id: string) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে সৈন্যের রেকর্ড মুছে ফেলা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const target = personnelList.find((p) => p.id === id);
     if (target) {
       setPersonnelList((prev) => prev.filter((p) => p.id !== id));
@@ -1922,6 +2011,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateParadeStatus = (id: string, status: ParadeStatus, statusDetails?: string) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে প্যারেড স্ট্যাটাস পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     let updatedDoc: Partial<Personnel> | null = null;
     setPersonnelList((prev) =>
       prev.map((p) => {
@@ -1957,6 +2050,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const batchUpdateStatus = (ids: string[], status: ParadeStatus, statusDetails?: string) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে প্যারেড স্ট্যাটাস পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     setPersonnelList((prev) =>
       prev.map((p) => {
         if (ids.includes(p.id)) {
@@ -2001,6 +2098,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       remarks?: string;
     }
   ) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে আউটার ইউনিট এসাইন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     let paradeStatus: ParadeStatus = 'Temp Duty';
     if (category === 'CMH') paradeStatus = 'CMH/Sick';
     else if (category === 'P/Lve' || category === 'C/Lve') paradeStatus = 'Leave';
@@ -2043,6 +2144,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const cancelOutOfUnit = (personnelId: string) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে আউটার ইউনিট বাতিল করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const patch: Record<string, any> = {
       status: 'Present',
       outOfUnitCategory: null,
@@ -2086,6 +2191,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Daily Parade State Management Handlers
   const updateParadePointCount = (pointId: string, battery: Battery, counts: ParadePointCount) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে প্যারেড পয়েন্ট কাউন্ট পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     let updatedPt: DailyParadePoint | null = null;
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -2126,6 +2235,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const togglePointForBattery = (pointId: string, battery: Battery, enabled: boolean) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে কোনো পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     let updatedPt: DailyParadePoint | null = null;
     setDailyParadePoints((prev) =>
       prev.map((pt) => {
@@ -2151,6 +2264,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setRsmPointSuggestion = (pointId: string, suggestion: Partial<ParadePointCount>) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে কোনো পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     let updatedPt: DailyParadePoint | null = null;
     setDailyParadePoints((prev) =>
       prev.map((pt) => {
@@ -2172,6 +2289,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addDailyParadePoint = (name: string, enabledBatteries?: Battery[], initialCounts?: ParadePointCount) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে নতুন প্যারেড পয়েন্ট যোগ করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const trimmed = name.trim();
     if (!trimmed) return;
     const newId = 'pt-' + Date.now();
@@ -2197,6 +2318,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteDailyParadePoint = (pointId: string) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে প্যারেড পয়েন্ট মুছে ফেলা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const target = dailyParadePoints.find((p) => p.id === pointId);
     setDailyParadePoints((prev) => prev.filter((p) => p.id !== pointId));
     showNotification(`Parade point "${target?.name}" removed.`);
@@ -2206,6 +2331,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleDailyParadePointActive = (pointId: string, active: boolean) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে প্যারেড পয়েন্ট পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     setDailyParadePoints((prev) =>
       prev.map((p) => (p.id === pointId ? { ...p, isActive: active } : p))
     );
@@ -2214,6 +2343,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addDutyAssignment = (assignment: Omit<DutyAssignment, 'id'>) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে ডিউটি রোস্টার পরিবর্তন করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
     const newAssignment: DutyAssignment = {
       ...assignment,
       id: 'duty-' + Date.now(),
@@ -2301,6 +2434,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchRole,
         isAdmin,
         isRSM,
+        isGuest,
         usersList,
         addUser,
         updateUser,

@@ -35,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
     isFirebaseReady,
     logout,
     isRealAdmin,
+    isGuest,
     isSimulating,
     exitSimulation,
   } = useApp();
@@ -74,8 +75,36 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white">
+      {/* GUEST — VIEW ONLY Banner */}
+      {isGuest && (
+        <div className="bg-gradient-to-r from-amber-600/30 via-orange-600/20 to-amber-600/30 border-b border-amber-500/50 text-amber-100 px-4 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-black tracking-wider text-[11px] uppercase shadow-sm">
+              GUEST — VIEW ONLY
+            </span>
+            <span className="font-semibold text-amber-200">
+              {isSimulating
+                ? `রোল সিমুলেটর সক্রিয়: বর্তমানে ${currentUser.role} ${currentUser.assignedBattery ? `(${currentUser.assignedBattery})` : ''} রোলের ভিউ দেখছেন (Read-Only Demo)`
+                : 'রিড-অনলি ডেমো মোড: আপনি সকল ডেটা, রোল ও প্যারেড স্টেট পর্যবেক্ষণ করতে পারবেন'}
+            </span>
+          </div>
+          {isSimulating ? (
+            <button
+              onClick={exitSimulation}
+              className="px-2.5 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] transition-colors cursor-pointer shadow"
+            >
+              গেস্ট ড্যাশবোর্ডে ফিরুন (Exit)
+            </button>
+          ) : (
+            <span className="text-[10px] text-amber-300/80 font-mono hidden sm:inline">
+              [No Editing / Saving Permitted]
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Simulation Active Notice Banner for Admin */}
-      {isSimulating && (
+      {!isGuest && isSimulating && (
         <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-200 px-4 py-1 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
@@ -163,29 +192,35 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{militaryTime}</span>
             </div>
 
-            {/* Role Switcher Dropdown - PERSISTENT FOR REAL ADMIN THROUGHOUT THE ENTIRE SESSION */}
-            {isRealAdmin && (
+            {/* Role Switcher Dropdown - AVAILABLE FOR ADMIN AND GUEST DEMO */}
+            {(isRealAdmin || isGuest) && (
               <div className="relative">
                 <button
                   onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
                   title={
-                    isSimulating
-                      ? `সিমুলেশন চলছে: ${currentUser.role} (ক্লিক করে অন্য রোল সিলেক্ট করুন অথবা এডমিনে ফিরুন)`
-                      : 'Admin Role Simulator'
+                    isGuest
+                      ? (isSimulating
+                          ? `ডেমো সিমুলেশন: ${currentUser.role} (ক্লিক করে অন্য রোল সিলেক্ট করুন)`
+                          : 'Guest Role Simulator (Demo Mode)')
+                      : (isSimulating
+                          ? `সিমুলেশন চলছে: ${currentUser.role} (ক্লিক করে অন্য রোল সিলেক্ট করুন অথবা এডমিনে ফিরুন)`
+                          : 'Admin Role Simulator')
                   }
                   className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-medium shadow-sm transition-all cursor-pointer ${
-                    isSimulating
+                    isGuest
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-200'
+                      : isSimulating
                       ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/60 text-amber-200 ring-1 ring-amber-500/30'
                       : 'bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-850 hover:to-slate-750 border-slate-700 text-slate-200'
                   }`}
                 >
                   <div
                     className={`w-2 h-2 rounded-full ${
-                      isSimulating ? 'bg-amber-400 animate-ping' : 'bg-emerald-400 animate-ping'
+                      isSimulating ? 'bg-amber-400 animate-ping' : isGuest ? 'bg-amber-400' : 'bg-emerald-400 animate-ping'
                     }`}
                   />
-                  <span className={`font-semibold ${isSimulating ? 'text-amber-300 font-bold' : 'text-amber-300'}`}>
-                    {isSimulating ? `Simulating: ${currentUser.role}` : 'Role Simulator'}
+                  <span className={`font-semibold ${isSimulating ? 'text-amber-300 font-bold' : isGuest ? 'text-amber-300' : 'text-amber-300'}`}>
+                    {isGuest ? (isSimulating ? `Demo View: ${currentUser.role}` : 'Role Simulator (Demo)') : (isSimulating ? `Simulating: ${currentUser.role}` : 'Role Simulator')}
                   </span>
                   {currentUser.assignedBattery && (
                     <span className="text-slate-400 font-mono text-[11px] hidden sm:inline">
@@ -198,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {roleDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-2 z-50 text-slate-200 divide-y divide-slate-800">
                     <div className="px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 font-semibold font-mono">
-                      <span>ADMIN ROLE SIMULATOR</span>
+                      <span>{isGuest ? 'GUEST ROLE SIMULATOR (DEMO)' : 'ADMIN ROLE SIMULATOR'}</span>
                       {isSimulating && (
                         <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-sans font-semibold">
                           Active Sim
@@ -216,7 +251,7 @@ export const Header: React.FC<HeaderProps> = ({
                           className="w-full text-center px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                         >
                           <ShieldAlert className="w-3.5 h-3.5 text-slate-950" />
-                          <span>Exit Simulation (এডমিন মোডে ফিরুন)</span>
+                          <span>{isGuest ? 'Exit to Guest View (গেস্টে ফিরুন)' : 'Exit Simulation (এডমিন মোডে ফিরুন)'}</span>
                         </button>
                       </div>
                     )}

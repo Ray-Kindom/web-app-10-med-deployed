@@ -39,6 +39,7 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
     paradeBatteryStatus,
     setBatteryParadeStatus,
     dailyParadePoints,
+    isGuest,
   } = useApp();
 
   const totals = getRegimentalTotals();
@@ -51,6 +52,10 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
 
   const handleAddDuty = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isGuest) {
+      showNotification('Guest mode is view-only. You cannot make any changes.');
+      return;
+    }
     const soldier = personnelList.find((p) => p.id === selectedSoldierId);
     if (!soldier) return;
 
@@ -96,7 +101,7 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {onOpenAddModal && (
+            {onOpenAddModal && !isGuest && (
               <button
                 onClick={onOpenAddModal}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950/40 transition-colors cursor-pointer"
@@ -105,13 +110,15 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
                 <span>Enlist Soldier</span>
               </button>
             )}
-            <button
-              onClick={() => setDutyModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-950/40 transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Detail Guard Shift</span>
-            </button>
+            {!isGuest && (
+              <button
+                onClick={() => setDutyModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-950/40 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Detail Guard Shift</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -151,14 +158,22 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
                   </div>
 
                   <button
-                    onClick={() => setBatteryParadeStatus(bty, isConfirmed ? 'Pending' : 'Confirmed')}
-                    className={`w-full py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                      isConfirmed
-                        ? 'bg-slate-800 hover:bg-slate-750 text-slate-300 border-slate-700'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-950/40'
+                    onClick={() => {
+                      if (isGuest) {
+                        showNotification('Guest mode is view-only. You cannot make any changes.');
+                        return;
+                      }
+                      setBatteryParadeStatus(bty, isConfirmed ? 'Pending' : 'Confirmed');
+                    }}
+                    className={`w-full py-1 rounded-lg text-xs font-bold transition-all border ${
+                      isGuest
+                        ? 'bg-slate-800/60 text-slate-500 border-slate-800 cursor-not-allowed'
+                        : isConfirmed
+                        ? 'bg-slate-800 hover:bg-slate-750 text-slate-300 border-slate-700 cursor-pointer'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-950/40 cursor-pointer'
                     }`}
                   >
-                    {isConfirmed ? 'Revoke Confirmation' : 'Approve & Confirm'}
+                    {isGuest ? 'View Only' : isConfirmed ? 'Revoke Confirmation' : 'Approve & Confirm'}
                   </button>
                 </div>
               );

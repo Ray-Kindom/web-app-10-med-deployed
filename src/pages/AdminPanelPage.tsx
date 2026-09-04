@@ -53,6 +53,7 @@ export const AdminPanelPage: React.FC = () => {
     isRealAdmin,
     isSimulating,
     exitSimulation,
+    isGuest,
   } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -67,19 +68,31 @@ export const AdminPanelPage: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const isAdmin = currentUser.role === 'Admin' || isRealAdmin;
+  const isAdmin = !isGuest && (currentUser.role === 'Admin' || isRealAdmin);
 
   const handleOpenAddUser = () => {
+    if (isGuest) {
+      showNotification('Guest mode is view-only. You cannot make any changes.');
+      return;
+    }
     setEditingUser(null);
     setIsUserModalOpen(true);
   };
 
   const handleOpenEditUser = (user: UserAccount) => {
+    if (isGuest) {
+      showNotification('Guest mode is view-only. You cannot make any changes.');
+      return;
+    }
     setEditingUser(user);
     setIsUserModalOpen(true);
   };
 
   const handleSaveUser = (userData: Omit<UserAccount, 'id'>, editId?: string) => {
+    if (isGuest) {
+      showNotification('Guest mode is view-only. You cannot make any changes.');
+      return;
+    }
     if (editId) {
       updateUser(editId, userData);
     } else {
@@ -88,6 +101,10 @@ export const AdminPanelPage: React.FC = () => {
   };
 
   const confirmDeleteUser = (user: UserAccount) => {
+    if (isGuest) {
+      showNotification('Guest mode is view-only. You cannot make any changes.');
+      return;
+    }
     if (user.id === currentUser.id) {
       showNotification('Access Violation: Cannot delete your currently active Administrator session.');
       return;
@@ -96,6 +113,10 @@ export const AdminPanelPage: React.FC = () => {
   };
 
   const executeDeleteUser = () => {
+    if (isGuest) {
+      showNotification('Guest mode is view-only. You cannot make any changes.');
+      return;
+    }
     if (userToDelete) {
       deleteUser(userToDelete.id);
       setUserToDelete(null);
@@ -178,9 +199,13 @@ export const AdminPanelPage: React.FC = () => {
                 System Administration
               </span>
               <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                isAdmin ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+                isGuest
+                  ? 'text-amber-300 bg-amber-500/20 border border-amber-500/40'
+                  : isAdmin
+                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
+                  : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
               }`}>
-                {isAdmin ? 'FULL ADMIN ACCESS' : `VIEW MODE (${currentUser.role})`}
+                {isGuest ? 'GUEST — VIEW ONLY' : isAdmin ? 'FULL ADMIN ACCESS' : `VIEW MODE (${currentUser.role})`}
               </span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight font-sans mt-1">

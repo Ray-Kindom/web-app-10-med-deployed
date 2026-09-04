@@ -24,7 +24,7 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
   onViewDossier,
   onOpenAddModal,
 }) => {
-  const { personnelList, currentUser } = useApp();
+  const { personnelList, currentUser, isGuest } = useApp();
 
   // Battery serial: P Bty, Q Bty, R Bty, HQ Bty
   const batteryOrder: Battery[] = ['P Bty', 'Q Bty', 'R Bty', 'HQ Bty'];
@@ -124,7 +124,7 @@ export const MasterPersonnelPage: React.FC<MasterPersonnelPageProps> = ({
           </h1>
         </div>
 
-        {['RSM', 'Admin'].includes(currentUser.role) && (
+        {['RSM', 'Admin'].includes(currentUser.role) && !isGuest && (
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <button
               onClick={onOpenAddModal}

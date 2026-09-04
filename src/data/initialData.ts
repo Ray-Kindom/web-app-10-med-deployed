@@ -6995,6 +6995,19 @@ export const INITIAL_USERS: UserAccount[] = [
     accessLevel: 'Full System Administrator',
     assignedBatteries: ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'],
     lastLogin: 'Today, 09:00 hrs'
+  },
+  {
+    id: 'guest-account',
+    username: 'Guest',
+    password: 'guest123',
+    name: 'Guest Viewer',
+    snkNo: 'GUEST-10M',
+    rank: 'Visitor',
+    role: 'Guest',
+    accessLevel: 'GUEST — VIEW ONLY',
+    assignedBatteries: ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'],
+    assignedBattery: 'HQ Bty',
+    lastLogin: 'Active Demo Session'
   }
 ];
 

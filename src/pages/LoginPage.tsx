@@ -14,6 +14,8 @@ import {
   X,
   KeyRound,
   Cloud,
+  UserCheck,
+  Sparkles,
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
@@ -33,14 +35,24 @@ export const LoginPage: React.FC = () => {
   // Group or order users: CO, Offr, RSM, P BSM, Q BSM, R BSM, HQ BSM, Admin, followed by custom additions
   const roleRankOrder = ['CO', 'Offr', 'RSM', 'P BSM', 'Q BSM', 'R BSM', 'HQ BSM', 'Admin'];
 
-  const sortedUsers = [...usersList].sort((a, b) => {
-    const orderA = roleRankOrder.indexOf(a.role);
-    const orderB = roleRankOrder.indexOf(b.role);
-    const weightA = orderA === -1 ? 99 : orderA;
-    const weightB = orderB === -1 ? 99 : orderB;
-    if (weightA !== weightB) return weightA - weightB;
-    return (a.name || '').localeCompare(b.name || '');
-  });
+  const sortedUsers = [...usersList]
+    .filter((u) => u.role !== 'Guest' && u.username.toLowerCase() !== 'guest')
+    .sort((a, b) => {
+      const orderA = roleRankOrder.indexOf(a.role);
+      const orderB = roleRankOrder.indexOf(b.role);
+      const weightA = orderA === -1 ? 99 : orderA;
+      const weightB = orderB === -1 ? 99 : orderB;
+      if (weightA !== weightB) return weightA - weightB;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+  const handleGuestLogin = () => {
+    setErrorMessage(null);
+    const result = loginWithCredentials('Guest', 'guest123');
+    if (!result.success) {
+      setErrorMessage(result.error || 'গেস্ট লগইন করতে সমস্যা হয়েছে।');
+    }
+  };
 
   const handleOpenPasswordModal = (user: UserAccount) => {
     setSelectedUser(user);
@@ -99,6 +111,62 @@ export const LoginPage: React.FC = () => {
             <span className="text-xs text-slate-400 font-mono">
               Smart Dashboard
             </span>
+          </div>
+        </div>
+
+        {/* Large Clearly Visible Guest Login Box / Card */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950/40 via-slate-900/90 to-slate-950 border-2 border-amber-500/60 p-5 sm:p-6 shadow-2xl shadow-amber-950/30">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  READ-ONLY DEMO MODE
+                </span>
+                <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+                  Full Regimental Visibility
+                </span>
+              </div>
+
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-amber-400 tracking-wide font-mono flex items-center gap-2.5">
+                  <ShieldCheck className="w-6 h-6 text-amber-400 shrink-0" />
+                  <span>GUEST LOGIN</span>
+                </h2>
+                <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+                  প্যারেড স্টেট, রোল সিমুলেটর, নোমিনাল রোল, ডিউটি রোস্টার এবং রেজিমেন্টের সকল ডেটা রিড-অনলি মোডে পর্যবেক্ষণ করতে গেস্ট হিসেবে প্রবেশ করুন।
+                </p>
+              </div>
+
+              {/* Display Credentials */}
+              <div className="flex flex-wrap items-center gap-3 pt-1 font-mono text-xs">
+                <div className="flex items-center gap-2 bg-slate-950/90 border border-slate-700/90 px-3.5 py-1.5 rounded-xl shadow-inner">
+                  <span className="text-slate-400 font-semibold">Username:</span>
+                  <code className="text-amber-300 font-bold bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30 text-xs sm:text-sm">
+                    Guest
+                  </code>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-950/90 border border-slate-700/90 px-3.5 py-1.5 rounded-xl shadow-inner">
+                  <span className="text-slate-400 font-semibold">Password:</span>
+                  <code className="text-amber-300 font-bold bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30 text-xs sm:text-sm">
+                    guest123
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-shrink-0 pt-2 md:pt-0">
+              <button
+                type="button"
+                onClick={handleGuestLogin}
+                className="w-full md:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm tracking-wide flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 hover:shadow-amber-500/40 transition-all cursor-pointer transform hover:-translate-y-0.5"
+              >
+                <UserCheck className="w-5 h-5 text-slate-950" />
+                <span>Login as Guest</span>
+                <ArrowRight className="w-4 h-4 text-slate-950" />
+              </button>
+            </div>
           </div>
         </div>
 

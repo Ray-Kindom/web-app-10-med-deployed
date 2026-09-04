@@ -51,6 +51,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     categoriesList,
     isAdmin,
     isRSM,
+    isGuest,
     updateParadePointCount,
     togglePointForBattery,
     setRsmPointSuggestion,
@@ -69,7 +70,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
 
   const activeDate = date || selectedParadeDate;
 
-  // Strict view-only access for Officers and CO - they must NOT have any Add, Edit, Delete, Update, or Modify option
+  // Strict view-only access for Guests, Officers and CO - they must NOT have any Add, Edit, Delete, Update, or Modify option
   const isOfficerOrCo =
     currentUser.role === 'CO' ||
     currentUser.role === 'Offr' ||
@@ -77,7 +78,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     (currentUser.role as string) === 'Officer' ||
     isOfficerRank(currentUser.rank);
 
-  const isReadOnly = isOfficerOrCo;
+  const isReadOnly = isOfficerOrCo || isGuest;
 
   const isRsmOrAdmin =
     !isReadOnly &&
@@ -498,8 +499,21 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
           </div>
         </div>
 
-        {/* Officer & CO View-Only Notice Banner */}
-        {isReadOnly && (
+        {/* Guest or Officer/CO View-Only Notice Banner */}
+        {isGuest ? (
+          <div className="px-6 py-2.5 bg-gradient-to-r from-amber-600/20 via-slate-900 to-amber-600/20 border-b border-amber-500/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-amber-300 font-mono font-bold">
+              <Eye className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="bg-amber-500 text-slate-950 px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                GUEST — VIEW ONLY
+              </span>
+              <span>DEMO MODE — COMPLETE PARADE STATE INSPECTION</span>
+            </div>
+            <span className="text-[11px] text-amber-200/90 font-mono">
+              Parade State is view-only. You can inspect all battery breakdowns, totals, and export sheets.
+            </span>
+          </div>
+        ) : isReadOnly && (
           <div className="px-6 py-2.5 bg-gradient-to-r from-amber-500/10 via-slate-900 to-amber-500/10 border-b border-amber-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2 text-amber-300 font-mono font-semibold">
               <Eye className="w-4 h-4 text-amber-400 shrink-0" />
