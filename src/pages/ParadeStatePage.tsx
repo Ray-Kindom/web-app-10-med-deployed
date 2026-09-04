@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { ParadeStateSummaryGrid } from '../components/parade/ParadeStateSummaryGrid';
 import { ParadeActionControls } from '../components/parade/ParadeActionControls';
@@ -6,21 +6,16 @@ import { LeaveModal } from '../components/parade/LeaveModal';
 import { CourseModal } from '../components/parade/CourseModal';
 import { SickModal } from '../components/parade/SickModal';
 import { DailyParadeStateModal } from '../components/parade/DailyParadeStateModal';
-import { Personnel, Battery } from '../types';
+import { Personnel, Battery, isOfficerRank } from '../types';
 import {
-  X,
   Plus,
-  ClipboardList,
-  CheckCircle2,
-  AlertTriangle,
-  Send,
-  ShieldCheck,
-  Users,
-  Layers,
-  PlaneTakeoff,
-  GraduationCap,
-  HeartPulse,
-  Compass,
+  PersonStanding,
+  Dumbbell,
+  Trophy,
+  Trash2,
+  Calendar,
+  Clock,
+  X,
 } from 'lucide-react';
 
 interface ParadeStatePageProps {
@@ -37,6 +32,7 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
   const {
     personnelList,
     currentUser,
+    isAdmin,
     getRegimentalTotals,
     showNotification,
     addAuditLog,
@@ -46,9 +42,11 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
     setSelectedParadeDate,
     paradeTypes,
     addParadeType,
+    deleteParadeType,
     getParadeRecord,
     confirmBatteryParadeRecord,
     finalizeParadeType,
+    dailyParadePoints,
   } = useApp();
 
   const [activeModalSession, setActiveModalSession] = useState<string | null>(null);
@@ -61,9 +59,21 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
   const [isComdModalOpen, setIsComdModalOpen] = useState(false);
 
   const totals = getRegimentalTotals();
-  const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
-  const isRsm = currentUser.role === 'RSM' || currentUser.role === 'Admin';
+  const isOfficerOrCo =
+    currentUser.role === 'CO' ||
+    currentUser.role === 'Offr' ||
+    (currentUser.role as string) === '2IC' ||
+    (currentUser.role as string) === 'Officer' ||
+    isOfficerRank(currentUser.rank);
+  const isActualRsm = currentUser.role === 'RSM';
+  const isBsm = !isOfficerOrCo && ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
+  const isRsm = !isOfficerOrCo && (currentUser.role === 'RSM' || currentUser.role === 'Admin' || isAdmin);
   const assignedBty = (currentUser.assignedBattery as Battery) || 'P Bty';
+
+  // Filter out soft-deleted/archived parade states for normal display across all dashboards
+  const activeParadeTypes = useMemo(() => {
+    return paradeTypes.filter((t) => !t.isDeleted && !t.deleted && t.isActive !== false);
+  }, [paradeTypes]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -81,9 +91,95 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
     }
   };
 
+  const getParadeTypeIcon = (typeName: string) => {
+    const lower = typeName.toLowerCase();
+    // 2nd period: Strictly multiple soldiers falling in / standing in formation
+    if (lower.includes('second') || lower.includes('period') || lower.includes('cadre') || lower.includes('trg')) {
+      return (
+        <div className="flex items-center -space-x-1.5 text-cyan-400" title="Soldiers Fall-in Formation">
+          <PersonStanding className="w-4 h-4 text-cyan-400/80" />
+          <PersonStanding className="w-5 h-5 text-cyan-300 scale-110" />
+          <PersonStanding className="w-4 h-4 text-cyan-400/80" />
+        </div>
+      );
+    }
+    if (lower.includes('game') || lower.includes('sport')) {
+      return (
+        <div className="relative flex items-center justify-center" title="Games & Sports">
+          <PersonStanding className="w-5 h-5 text-emerald-400" />
+          <Trophy className="w-3 h-3 text-amber-300 absolute -bottom-0.5 -right-0.5 drop-shadow" />
+        </div>
+      );
+    }
+    // Default & Morning State: Soldier doing PT (PersonStanding + Dumbbell)
+    return (
+      <div className="relative flex items-center justify-center" title="Soldier doing PT">
+        <PersonStanding className="w-5 h-5 text-rose-400" />
+        <Dumbbell className="w-3 h-3 text-amber-300 absolute -bottom-0.5 -right-0.5 drop-shadow" />
+      </div>
+    );
+  };
+
+  const getParadeTypeStats = (typeName: string) => {
+    let count = 0;
+    let lastEditTime = 'Not Edited';
+
+    const onParadePt = dailyParadePoints.find(
+      (p) => p.name.trim().toUpperCase() === 'ON PARADE'
+    );
+
+    if (isBsm) {
+      const rec = getParadeRecord(selectedParadeDate, typeName, assignedBty);
+      const ptCount = onParadePt && rec.counts?.[onParadePt.id];
+      if (ptCount && (ptCount.offr + ptCount.jco + ptCount.or > 0)) {
+        count = ptCount.offr + ptCount.jco + ptCount.or;
+      } else {
+        count = personnelList.filter(
+          (p) => p.battery === assignedBty && p.status === 'Present'
+        ).length;
+      }
+      if (rec.lastUpdated && rec.lastUpdated !== 'Not submitted') {
+        lastEditTime = rec.lastUpdated;
+      }
+    } else {
+      let regtCount = 0;
+      let hasRecordCounts = false;
+      let latestEdit = '';
+
+      (['P Bty', 'Q Bty', 'R Bty', 'HQ Bty'] as Battery[]).forEach((bty) => {
+        const rec = getParadeRecord(selectedParadeDate, typeName, bty);
+        const ptCount = onParadePt && rec.counts?.[onParadePt.id];
+        if (ptCount && (ptCount.offr + ptCount.jco + ptCount.or > 0)) {
+          regtCount += ptCount.offr + ptCount.jco + ptCount.or;
+          hasRecordCounts = true;
+        }
+        if (rec.lastUpdated && rec.lastUpdated !== 'Not submitted') {
+          if (!latestEdit || rec.lastUpdated > latestEdit) {
+            latestEdit = rec.lastUpdated;
+          }
+        }
+      });
+
+      count = hasRecordCounts ? regtCount : totals.totalPresent;
+      lastEditTime = latestEdit || 'Not Edited';
+    }
+
+    let formattedEditTime = lastEditTime;
+    if (lastEditTime.includes(' ')) {
+      formattedEditTime = lastEditTime;
+    } else if (lastEditTime.includes('T')) {
+      const d = new Date(lastEditTime);
+      if (!isNaN(d.getTime())) {
+        formattedEditTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      }
+    }
+
+    return { count, lastEditTime: formattedEditTime };
+  };
+
   return (
     <div className="space-y-6">
-      {/* 4 PRIMARY PARADE STATE TYPE BOXES/CARDS (Morning, Second Period, Games, Roll Call + Dynamic) */}
+      {/* PRIMARY PARADE STATE TYPE BOXES/CARDS (Morning, Second Period, Games + Dynamic) */}
       <div className="space-y-2">
         {isRsm && (
           <div className="flex justify-end px-1">
@@ -97,45 +193,113 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {paradeTypes.map((type) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {activeParadeTypes.map((type) => {
             const btyRecord = getParadeRecord(selectedParadeDate, type.name, assignedBty);
             const badge = getStatusBadge(btyRecord.status);
+            const stats = getParadeTypeStats(type.name);
+
+            // Permission rules for deleting parade states:
+            // Admin-created: Only Admin can delete (RSM, Officers, CO cannot delete)
+            // RSM-created: RSM can delete, Admin can delete (Officers, CO cannot delete)
+            const isCreatorAdmin = !type.createdBy || type.createdBy.toUpperCase().includes('ADMIN');
+            const isCreatorRsm = type.createdBy?.toUpperCase().includes('RSM');
+            const canDelete = !isOfficerOrCo && (isAdmin || (isActualRsm && isCreatorRsm && !isCreatorAdmin));
 
             return (
               <div
                 key={type.id}
                 onClick={() => setActiveModalSession(type.name)}
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-850 hover:border-rose-500/60 p-4 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-rose-950/30 cursor-pointer flex flex-col justify-between"
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 hover:border-rose-500/60 p-4 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-rose-950/30 cursor-pointer flex flex-col justify-between"
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
-                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 group-hover:scale-105 transition-transform">
-                      <ClipboardList className="w-5 h-5" />
+                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 group-hover:scale-105 transition-transform flex items-center justify-center">
+                      {getParadeTypeIcon(type.name)}
                     </div>
-                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${badge.bg}`}>
-                      {badge.text}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800/90 text-slate-400 border border-slate-700/80" title={`Created by: ${type.createdBy || 'Admin'}`}>
+                        {type.createdBy === 'RSM' ? 'RSM' : 'Admin'}
+                      </span>
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${badge.bg}`}>
+                        {badge.text}
+                      </span>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Are you sure you want to delete "${type.name}" Parade State?`)) {
+                              deleteParadeType(type.id);
+                            }
+                          }}
+                          title={`Delete ${type.name} box`}
+                          className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-800/80 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div>
                     <h3 className="text-base font-bold text-white group-hover:text-rose-300 transition-colors font-sans">
                       {type.name}
                     </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-1">
+                      <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Date: <strong className="text-slate-200">{selectedParadeDate}</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Highlighted On Parade metric box */}
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+                    <span className="text-xs font-mono font-medium text-emerald-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      On Parade:
+                    </span>
+                    <div className="text-right font-mono">
+                      <span className="text-base font-bold text-emerald-300">
+                        {stats.count}
+                      </span>
+                      <span className="text-[10px] text-slate-500 ml-1">
+                        {isBsm ? `(${assignedBty})` : `(Regt)`}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
-                  <span className="text-[10px]">
-                    {btyRecord.lastUpdated ? `Updt: ${btyRecord.lastUpdated.slice(-5)}` : 'No Entry'}
+                  <span className="text-[10px] flex items-center gap-1 text-slate-400" title="Last Edit Time">
+                    <Clock className="w-3 h-3 text-slate-500" />
+                    <span>Last Edit: <strong className="text-slate-300">{stats.lastEditTime}</strong></span>
                   </span>
-                  <span className="text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform text-[11px]">
+                  <span className="text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform text-[11px] flex items-center gap-0.5">
                     Open Sheet →
                   </span>
                 </div>
               </div>
             );
           })}
+
+          {/* Sequential ADD NEW PARADE STATE box for RSM & Admin at the end of the grid */}
+          {!isOfficerOrCo && (isActualRsm || isRsm || isAdmin) && (
+            <div
+              id="btn-add-new-parade-state-box"
+              onClick={() => setIsAddTypeModalOpen(true)}
+              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900/50 via-slate-900/70 to-slate-950 border-2 border-dashed border-slate-700/80 hover:border-purple-500/80 p-5 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-purple-950/30 cursor-pointer flex flex-col items-center justify-center min-h-[220px] text-center"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/30 group-hover:scale-110 group-hover:bg-purple-500/20 group-hover:border-purple-500/50 transition-all flex items-center justify-center text-purple-400 mb-3 shadow-inner">
+                <Plus className="w-8 h-8" />
+              </div>
+              <span className="text-sm font-bold font-mono tracking-wider text-slate-200 group-hover:text-purple-300 transition-colors uppercase">
+                ADD NEW PARADE STATE
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono mt-1">
+                Click to configure new session
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -143,61 +307,6 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
       {(isBsm || isRsm) && (
         <ParadeActionControls battery={isBsm ? assignedBty : undefined} />
       )}
-
-      {/* Quick Category Action Cards for Lve, Course, CMH/Sick, COMD */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <button
-          onClick={() => setIsLeaveModalOpen(true)}
-          className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-purple-500/30 hover:border-purple-500 flex items-center justify-between transition-all group text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <PlaneTakeoff className="w-4 h-4 text-purple-400" />
-            <span className="font-bold text-white text-xs font-mono">Lve (Leave)</span>
-          </div>
-          <span className="text-sm font-mono font-bold text-purple-400 bg-purple-950/60 px-2 py-1 rounded border border-purple-500/30">
-            {totals.totalLeave}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setIsCourseModalOpen(true)}
-          className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-cyan-500/30 hover:border-cyan-500 flex items-center justify-between transition-all group text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <GraduationCap className="w-4 h-4 text-cyan-400" />
-            <span className="font-bold text-white text-xs font-mono">Course</span>
-          </div>
-          <span className="text-sm font-mono font-bold text-cyan-400 bg-cyan-950/60 px-2 py-1 rounded border border-cyan-500/30">
-            {totals.totalCourse}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setIsSickModalOpen(true)}
-          className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-amber-500/30 hover:border-amber-500 flex items-center justify-between transition-all group text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <HeartPulse className="w-4 h-4 text-amber-400" />
-            <span className="font-bold text-white text-xs font-mono">CMH/Sick</span>
-          </div>
-          <span className="text-sm font-mono font-bold text-amber-400 bg-amber-950/60 px-2 py-1 rounded border border-amber-500/30">
-            {totals.totalSick}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setIsComdModalOpen(true)}
-          className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-indigo-500/30 hover:border-indigo-500 flex items-center justify-between transition-all group text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <Compass className="w-4 h-4 text-indigo-400" />
-            <span className="font-bold text-white text-xs font-mono">COMD</span>
-          </div>
-          <span className="text-sm font-mono font-bold text-indigo-400 bg-indigo-950/60 px-2 py-1 rounded border border-indigo-500/30">
-            {totals.totalTempDuty + totals.totalAttached}
-          </span>
-        </button>
-      </div>
 
       {/* Battery-Wise Matrix */}
       <ParadeStateSummaryGrid

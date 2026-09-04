@@ -238,7 +238,14 @@ export interface ParadeTypeDefinition {
   isActive: boolean;
   headings?: string[]; // Heading ids/names associated
   createdAt?: string;
-  createdBy?: string;
+  createdBy?: 'Admin' | 'RSM' | string;
+  createdByName?: string;
+  isDeleted?: boolean;
+  deleted?: boolean;
+  status?: 'active' | 'deleted' | string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletedByRole?: 'Admin' | 'RSM' | string;
 }
 
 export interface DateWiseParadeRecord {

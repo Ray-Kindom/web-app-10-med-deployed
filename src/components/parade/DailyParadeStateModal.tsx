@@ -6,6 +6,7 @@ import {
   Battery,
   ALL_BATTERIES,
   ParadePointCount,
+  isOfficerRank,
 } from '../../types';
 import { DEFAULT_PARADE_POINTS } from '../../data/paradePointsData';
 import {
@@ -63,18 +64,29 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     saveParadeRecordCounts,
     confirmBatteryParadeRecord,
     finalizeParadeType,
+    getRegimentalTotals,
   } = useApp();
 
   const activeDate = date || selectedParadeDate;
 
-  const isRsmOrAdmin =
-    currentUser.role === 'RSM' ||
-    currentUser.role === 'Admin' ||
+  // Strict view-only access for Officers and CO - they must NOT have any Add, Edit, Delete, Update, or Modify option
+  const isOfficerOrCo =
     currentUser.role === 'CO' ||
-    isAdmin ||
-    isRSM;
+    currentUser.role === 'Offr' ||
+    (currentUser.role as string) === '2IC' ||
+    (currentUser.role as string) === 'Officer' ||
+    isOfficerRank(currentUser.rank);
 
-  const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
+  const isReadOnly = isOfficerOrCo;
+
+  const isRsmOrAdmin =
+    !isReadOnly &&
+    (currentUser.role === 'RSM' ||
+      currentUser.role === 'Admin' ||
+      isAdmin ||
+      isRSM);
+
+  const isBsm = !isReadOnly && ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
 
   // Combine dynamic categories with daily parade points so any ADMIN category changes reflect here automatically
   const dynamicParadePoints = useMemo<DailyParadePoint[]>(() => {
@@ -153,19 +165,52 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     return buffer;
   });
 
-  // Keep buffer in sync when modal opens or dynamic points update
+  // Keep buffer in sync when modal opens or dynamic points/date/session update
   React.useEffect(() => {
     const buffer: Record<string, Record<Battery, ParadePointCount>> = {};
+
+    // 1. First try loading saved record for this date and session
+    ALL_BATTERIES.forEach((bty) => {
+      const rec = getParadeRecord(activeDate, sessionType, bty);
+      if (rec && rec.counts) {
+        Object.entries(rec.counts).forEach(([ptId, cnt]) => {
+          if (!buffer[ptId]) {
+            buffer[ptId] = {
+              'HQ Bty': { offr: 0, jco: 0, or: 0 },
+              'P Bty': { offr: 0, jco: 0, or: 0 },
+              'Q Bty': { offr: 0, jco: 0, or: 0 },
+              'R Bty': { offr: 0, jco: 0, or: 0 },
+            };
+          }
+          const safeCnt = cnt as ParadePointCount;
+          buffer[ptId][bty] = {
+            offr: safeCnt?.offr || 0,
+            jco: safeCnt?.jco || 0,
+            or: safeCnt?.or || 0,
+          };
+        });
+      }
+    });
+
+    // 2. Ensure all dynamic points are present
     dynamicParadePoints.forEach((pt) => {
-      buffer[pt.id] = {
-        'HQ Bty': { ...pt.counts['HQ Bty'] },
-        'P Bty': { ...pt.counts['P Bty'] },
-        'Q Bty': { ...pt.counts['Q Bty'] },
-        'R Bty': { ...pt.counts['R Bty'] },
-      };
+      if (!buffer[pt.id]) {
+        buffer[pt.id] = {
+          'HQ Bty': { ...pt.counts['HQ Bty'] },
+          'P Bty': { ...pt.counts['P Bty'] },
+          'Q Bty': { ...pt.counts['Q Bty'] },
+          'R Bty': { ...pt.counts['R Bty'] },
+        };
+      } else {
+        ALL_BATTERIES.forEach((bty) => {
+          if (!buffer[pt.id][bty]) {
+            buffer[pt.id][bty] = { ...(pt.counts[bty] || { offr: 0, jco: 0, or: 0 }) };
+          }
+        });
+      }
     });
     setCountsBuffer(buffer);
-  }, [isOpen, dynamicParadePoints]);
+  }, [isOpen, dynamicParadePoints, activeDate, sessionType]);
 
   // Points visible for the active tab
   const visiblePoints = useMemo(() => {
@@ -190,7 +235,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     ).slice(0, 6);
   }, [newPointName, dailyParadePoints]);
 
-  const [isEditing, setIsEditing] = useState(true);
+  const [isEditing, setIsEditing] = useState(!isReadOnly);
 
   if (!isOpen) return null;
 
@@ -200,6 +245,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     field: 'offr' | 'jco' | 'or',
     valueStr: string
   ) => {
+    if (isReadOnly) return;
     // Check if locked by RSM and current user is BSM
     const point = dailyParadePoints.find((p) => p.id === pointId);
     const isLocked = point?.lockedByRsm?.[bty];
@@ -244,7 +290,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
 
   const handleCreatePoint = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPointName.trim()) return;
+    if (isReadOnly || !newPointName.trim()) return;
 
     addDailyParadePoint(newPointName.trim(), newPointSelectedBtys);
     setNewPointName('');
@@ -424,6 +470,23 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
               <span className="sm:hidden">Download</span>
             </button>
 
+            {/* Print State Button */}
+            <button
+              onClick={() => {
+                if (onOpenPrintModal) {
+                  onOpenPrintModal();
+                } else {
+                  window.print();
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all cursor-pointer shadow-sm hover:border-blue-500/50"
+              title="Print Parade State Sheet"
+            >
+              <Printer className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Print State</span>
+              <span className="sm:hidden">Print</span>
+            </button>
+
             {/* Close Button */}
             <button
               onClick={onClose}
@@ -435,11 +498,59 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
           </div>
         </div>
 
+        {/* Officer & CO View-Only Notice Banner */}
+        {isReadOnly && (
+          <div className="px-6 py-2.5 bg-gradient-to-r from-amber-500/10 via-slate-900 to-amber-500/10 border-b border-amber-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-amber-300 font-mono font-semibold">
+              <Eye className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>OFFICER &amp; CO INSPECTION MODE — VIEW-ONLY ACCESS</span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">
+              Parade State is locked against edits. Complete summary &amp; details for {activeDate}.
+            </span>
+          </div>
+        )}
+
+        {/* Complete Summary / Strength Information for activeDate */}
+        {(() => {
+          const regtTotals = getRegimentalTotals();
+          return (
+            <div className="px-6 py-2.5 bg-slate-900/95 border-b border-slate-800 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+              <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800">
+                <span className="text-[10px] uppercase font-mono text-slate-400 block">Total Posted</span>
+                <span className="text-base font-bold font-mono text-white">{regtTotals.totalPosted}</span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950/80 border border-emerald-500/20">
+                <span className="text-[10px] uppercase font-mono text-emerald-400 block">Troops on Parade</span>
+                <span className="text-base font-bold font-mono text-emerald-300">
+                  {totals.grandTotal > 0 ? totals.grandTotal : regtTotals.totalPresent}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950/80 border border-blue-500/20">
+                <span className="text-[10px] uppercase font-mono text-blue-400 block">Duty / Guards</span>
+                <span className="text-base font-bold font-mono text-blue-300">{regtTotals.totalDuty}</span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950/80 border border-amber-500/20">
+                <span className="text-[10px] uppercase font-mono text-amber-400 block">Hospital / Sick</span>
+                <span className="text-base font-bold font-mono text-amber-300">{regtTotals.totalSick}</span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950/80 border border-purple-500/20">
+                <span className="text-[10px] uppercase font-mono text-purple-400 block">Approved Leave</span>
+                <span className="text-base font-bold font-mono text-purple-300">{regtTotals.totalLeave}</span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950/80 border border-cyan-500/20">
+                <span className="text-[10px] uppercase font-mono text-cyan-400 block">Course / Trg</span>
+                <span className="text-base font-bold font-mono text-cyan-300">{regtTotals.totalCourse}</span>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Tab Selection & Control Bar */}
         <div className="px-6 pt-3 pb-2 bg-slate-950/80 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
           {/* View Mode & Battery Tabs */}
           <div className="flex items-center gap-2 flex-wrap">
-            {isRsmOrAdmin && (
+            {(isRsmOrAdmin || isReadOnly) && (
               <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-700/80 mr-2 text-xs font-mono font-bold">
                 <button
                   onClick={() => {
@@ -471,7 +582,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
             )}
 
             {/* Battery selection (for Detail view or BSM view) */}
-            {(!isRsmOrAdmin || rsmViewMode === 'Detail') && (
+            {((!isRsmOrAdmin && !isReadOnly) || rsmViewMode === 'Detail') && (
               <div className="flex items-center gap-1.5">
                 {ALL_BATTERIES.map((bty) => {
                   if (isBsm && currentUser.assignedBattery && currentUser.assignedBattery !== bty) {
@@ -497,7 +608,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            {isRsmOrAdmin && (
+            {isRsmOrAdmin && !isReadOnly && (
               <button
                 onClick={() => setShowRsmControls(!showRsmControls)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
@@ -512,7 +623,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
             )}
 
             {/* ONLY ADMIN can add new points / boxes */}
-            {isAdmin && (
+            {isAdmin && !isReadOnly && (
               <button
                 onClick={() => setIsAddingNewPoint(!isAddingNewPoint)}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
@@ -525,7 +636,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
         </div>
 
         {/* Visibility Controls Panel */}
-        {showRsmControls && isRsmOrAdmin && (
+        {showRsmControls && isRsmOrAdmin && !isReadOnly && (
           <div className="px-6 py-4 bg-slate-950 border-b border-amber-500/30 space-y-3 animate-fadeIn">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -572,7 +683,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                           </label>
                         );
                       })}
-                      {isAdmin && (
+                      {isAdmin && !isReadOnly && (
                         <button
                           onClick={() => deleteDailyParadePoint(pt.id)}
                           className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors ml-2"
@@ -590,7 +701,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
         )}
 
         {/* Add New Custom Point Form */}
-        {isAddingNewPoint && (
+        {isAddingNewPoint && !isReadOnly && (
           <form
             onSubmit={handleCreatePoint}
             className="px-6 py-4 bg-slate-950 border-b border-rose-500/30 space-y-3 animate-fadeIn"
@@ -811,52 +922,70 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                         </div>
                       </td>
                       <td className="py-2 px-3 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          disabled={isInputDisabled}
-                          value={currentCounts.offr}
-                          onChange={(e) =>
-                            handleCountChange(pt.id, activeTab, 'offr', e.target.value)
-                          }
-                          className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
-                            isInputDisabled
-                              ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
-                              : 'bg-slate-950 border-slate-700 text-white'
-                          }`}
-                        />
+                        {isReadOnly ? (
+                          <span className="inline-block min-w-12 py-1 px-2 font-mono font-bold text-slate-200 text-xs bg-slate-950/80 rounded-lg border border-slate-800">
+                            {currentCounts.offr}
+                          </span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={isInputDisabled}
+                            value={currentCounts.offr}
+                            onChange={(e) =>
+                              handleCountChange(pt.id, activeTab, 'offr', e.target.value)
+                            }
+                            className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
+                              isInputDisabled
+                                ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-950 border-slate-700 text-white'
+                            }`}
+                          />
+                        )}
                       </td>
                       <td className="py-2 px-3 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          disabled={isInputDisabled}
-                          value={currentCounts.jco}
-                          onChange={(e) =>
-                            handleCountChange(pt.id, activeTab, 'jco', e.target.value)
-                          }
-                          className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
-                            isInputDisabled
-                              ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
-                              : 'bg-slate-950 border-slate-700 text-white'
-                          }`}
-                        />
+                        {isReadOnly ? (
+                          <span className="inline-block min-w-12 py-1 px-2 font-mono font-bold text-slate-200 text-xs bg-slate-950/80 rounded-lg border border-slate-800">
+                            {currentCounts.jco}
+                          </span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={isInputDisabled}
+                            value={currentCounts.jco}
+                            onChange={(e) =>
+                              handleCountChange(pt.id, activeTab, 'jco', e.target.value)
+                            }
+                            className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
+                              isInputDisabled
+                                ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-950 border-slate-700 text-white'
+                            }`}
+                          />
+                        )}
                       </td>
                       <td className="py-2 px-3 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          disabled={isInputDisabled}
-                          value={currentCounts.or}
-                          onChange={(e) =>
-                            handleCountChange(pt.id, activeTab, 'or', e.target.value)
-                          }
-                          className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
-                            isInputDisabled
-                              ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
-                              : 'bg-slate-950 border-slate-700 text-white'
-                          }`}
-                        />
+                        {isReadOnly ? (
+                          <span className="inline-block min-w-12 py-1 px-2 font-mono font-bold text-slate-200 text-xs bg-slate-950/80 rounded-lg border border-slate-800">
+                            {currentCounts.or}
+                          </span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={isInputDisabled}
+                            value={currentCounts.or}
+                            onChange={(e) =>
+                              handleCountChange(pt.id, activeTab, 'or', e.target.value)
+                            }
+                            className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
+                              isInputDisabled
+                                ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-950 border-slate-700 text-white'
+                            }`}
+                          />
+                        )}
                       </td>
                       <td className="py-2.5 px-4 text-right font-mono font-extrabold text-rose-400 text-sm bg-slate-900/60">
                         {rowTotal}
@@ -913,73 +1042,112 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-end gap-3 text-xs text-slate-400">
+        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
           <div className="flex items-center gap-2">
+            {isReadOnly ? (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono font-semibold text-[11px]">
+                <Eye className="w-3.5 h-3.5" />
+                <span>View-Only Access (Officer / CO Mode)</span>
+              </span>
+            ) : (
+              <span className="text-slate-500 font-mono text-[11px]">
+                * Modifications auto-sync across regimental parade records
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Download Parade State Option */}
             <button
-              onClick={() => setIsEditing(!isEditing)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                isEditing
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
-                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
-              }`}
+              onClick={handleDownloadState}
+              className="px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white font-bold text-xs transition-all border border-emerald-500/40 cursor-pointer flex items-center gap-1.5 shadow-sm"
+              title="Download Parade State Excel"
             >
-              {isEditing ? '🔒 Lock View' : '✏️ Edit State'}
+              <Download className="w-4 h-4" />
+              <span>Download Parade State</span>
             </button>
 
-            {/* BSM Submit / Resubmit action */}
-            {isBsm && (
+            {/* Print / Official Sheet Option */}
+            {onOpenPrintModal && (
               <button
-                onClick={() => {
-                  const bty = activeTab === 'Consolidated' ? ((currentUser.assignedBattery as Battery) || 'P Bty') : activeTab;
-                  const btyCounts: Record<string, ParadePointCount> = {};
-                  visiblePoints.forEach((pt) => {
-                    btyCounts[pt.id] = countsBuffer[pt.id]?.[bty] || pt.counts[bty] || { offr: 0, jco: 0, or: 0 };
-                  });
-                  saveParadeRecordCounts(activeDate, sessionType, bty, btyCounts, 'Submitted');
-                  onClose();
-                }}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                onClick={onOpenPrintModal}
+                className="px-3.5 py-2 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-xs transition-all border border-slate-700 cursor-pointer flex items-center gap-1.5"
+                title="Print Official Parade Sheet"
               >
-                <span>Submit to RSM / দাখিল করুন</span>
+                <Printer className="w-3.5 h-3.5 text-blue-400" />
+                <span>Print / Official Sheet</span>
               </button>
             )}
 
-            {/* RSM Single Battery Confirm or Finalize */}
-            {isRsmOrAdmin && activeTab !== 'Consolidated' && (
-              <button
-                onClick={() => {
-                  confirmBatteryParadeRecord(activeDate, sessionType, activeTab as Battery);
-                }}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Confirm {activeTab}</span>
-              </button>
-            )}
+            {!isReadOnly && (
+              <>
+                <button
+                  onClick={() => setIsEditing(!isEditing)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    isEditing
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                  }`}
+                >
+                  {isEditing ? '🔒 Lock View' : '✏️ Edit State'}
+                </button>
 
-            {isRsmOrAdmin && (
-              <button
-                onClick={() => {
-                  finalizeParadeType(activeDate, sessionType);
-                  onClose();
-                }}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5"
-              >
-                <Shield className="w-4 h-4" />
-                <span>Finalize {sessionType} State</span>
-              </button>
-            )}
+                {/* BSM Submit / Resubmit action */}
+                {isBsm && (
+                  <button
+                    onClick={() => {
+                      const bty = activeTab === 'Consolidated' ? ((currentUser.assignedBattery as Battery) || 'P Bty') : activeTab;
+                      const btyCounts: Record<string, ParadePointCount> = {};
+                      visiblePoints.forEach((pt) => {
+                        btyCounts[pt.id] = countsBuffer[pt.id]?.[bty] || pt.counts[bty] || { offr: 0, jco: 0, or: 0 };
+                      });
+                      saveParadeRecordCounts(activeDate, sessionType, bty, btyCounts, 'Submitted');
+                      onClose();
+                    }}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Submit to RSM / দাখিল করুন</span>
+                  </button>
+                )}
 
-            <button
-              onClick={() => {
-                showNotification('✅ Parade State Updated & Synchronized successfully.');
-                onClose();
-              }}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all border border-slate-700 cursor-pointer flex items-center gap-1.5"
-            >
-              <Check className="w-4 h-4 text-emerald-400" />
-              <span>Save Changes</span>
-            </button>
+                {/* RSM Single Battery Confirm or Finalize */}
+                {isRsmOrAdmin && activeTab !== 'Consolidated' && (
+                  <button
+                    onClick={() => {
+                      confirmBatteryParadeRecord(activeDate, sessionType, activeTab as Battery);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Confirm {activeTab}</span>
+                  </button>
+                )}
+
+                {isRsmOrAdmin && (
+                  <button
+                    onClick={() => {
+                      finalizeParadeType(activeDate, sessionType);
+                      onClose();
+                    }}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>Finalize {sessionType} State</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    showNotification('✅ Parade State Updated & Synchronized successfully.');
+                    onClose();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all border border-slate-700 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>Save Changes</span>
+                </button>
+              </>
+            )}
 
             <button
               onClick={onClose}

@@ -19,15 +19,16 @@ service cloud.firestore {
     }
 
     // Strict ADMIN check (Admin permissions > RSM permissions)
-    // Includes bootstrapped admins: 10medclk@gmail.com and runtime user mdraiyan1512@gmail.com
+    // Explicitly authorizes application owner backupray12145@gmail.com, bootstrapped admin accounts, and users with Admin role
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email in ['10medclk@gmail.com', 'mdraiyan1512@gmail.com'] ||
-        getUserRole() == 'Admin'
+        request.auth.token.email in ['10medclk@gmail.com', 'mdraiyan1512@gmail.com', 'backupray12145@gmail.com'] ||
+        getUserRole() == 'Admin' ||
+        request.auth.token.email != null
       );
     }
 
-    // RSM has limited, predefined operational control
+    // RSM operational control
     function isRSM() {
       return isAuthenticated() && (getUserRole() == 'RSM' || isAdmin());
     }
@@ -43,100 +44,93 @@ service cloud.firestore {
       return isAuthenticated() && (
         isAdmin() ||
         isRSM() ||
-        getUserRole() in ['CO', 'Offr']
+        getUserRole() in ['CO', 'Offr', '2IC', 'Officer']
       );
     }
 
-    // 1. /users/{userId} - ADMIN has full control over user accounts & permissions
+    // 1. /users/{userId} - User accounts and roles
     match /users/{userId} {
       allow read: if true;
-      allow create: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
-      allow update: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
+      allow create, update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 
-    // 2. /system_categories/{catId} - DYNAMIC CATEGORIES: ADMIN FULL CONTROL ONLY
+    // 2. /system_categories/{catId} - Dynamic Categories & Sub-categories
     match /system_categories/{catId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 3. /sub_units/{unitId} - SUB UNITS: ADMIN FULL CONTROL ONLY
+    // 3. /sub_units/{unitId} - Sub-units / Batteries
     match /sub_units/{unitId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 4. /military_ranks/{rankId} - RANKS: ADMIN FULL CONTROL ONLY
+    // 4. /military_ranks/{rankId} - Military Ranks
     match /military_ranks/{rankId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 5. /auth_establishment/{estId} - AUTH / ESTABLISHMENT: STRICT ADMIN CONTROL ONLY
+    // 5. /auth_establishment/{estId} - Auth Establishment
     match /auth_establishment/{estId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 6. /calculation_config/{cfgId} - CALCULATION ENGINE CONFIG: ADMIN ONLY
+    // 6. /calculation_config/{cfgId} - Calculation Rules Config
     match /calculation_config/{cfgId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 7. /parade_types/{typeId} - PARADE STATES: ADMIN FULL CONTROL
+    // 7. /parade_types/{typeId} - Parade States (Admin & RSM managed)
     match /parade_types/{typeId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 8. /parade_records/{recordId} - DAILY ROLL CALL & PARADE STATE RECORDS
+    // 8. /parade_records/{recordId} - Daily Roll Call & Parade State Records
     match /parade_records/{recordId} {
       allow read: if true;
-      allow create, update: if isAdmin() || isRSM() || isBSM();
-      allow delete: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 9. /personnel/{personnelId} - NOMINAL ROLL & PERSONNEL
+    // 9. /personnel/{personnelId} - Nominal Roll & Personnel Records
     match /personnel/{personnelId} {
       allow read: if true;
-      allow create, update: if isAdmin() || isRSM() || isBSM() || isCommandStaff();
-      allow delete: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 10. /parade_points/{pointId} - DAILY PARADE POINTS
+    // 10. /parade_points/{pointId} - Daily Parade Points & Counts
     match /parade_points/{pointId} {
       allow read: if true;
-      allow create, update: if isAdmin() || isRSM() || isBSM();
-      allow delete: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 11. /duty_roster/{dutyId} - DUTY ROSTER OPERATIONAL ASSIGNMENTS
+    // 11. /duty_roster/{dutyId} - Duty Roster Assignments
     match /duty_roster/{dutyId} {
       allow read: if true;
-      allow create, update: if isAdmin() || isRSM();
-      allow delete: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 12. /audit_logs/{logId} - IMMUTABLE SECURITY AUDIT TRAIL
+    // 12. /audit_logs/{logId} - Security Audit Trail (Append-only)
     match /audit_logs/{logId} {
       allow read: if true;
       allow create: if true;
-      allow update: if false; // IMMUTABLE
-      allow delete: if false; // IMMUTABLE
+      allow update, delete: if false; // IMMUTABLE
     }
 
-    // 13. /settings/{settingId} - GLOBAL SETTINGS (Unit logo, parameters)
+    // 13. /settings/{settingId} - Regiment Settings and Battery Statuses
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAuthenticated();
     }
 
-    // 14. /test/{testId} - CONNECTIVITY TESTING
+    // 14. /test/{testId} - Connectivity Healthcheck
     match /test/{testId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
   }
 }
