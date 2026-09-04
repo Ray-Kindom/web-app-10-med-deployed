@@ -12,6 +12,8 @@ import {
   Clock,
   Sparkles,
   Layers,
+  RotateCcw,
+  Archive,
 } from 'lucide-react';
 
 export const ParadeStateManagementTab: React.FC = () => {
@@ -20,6 +22,7 @@ export const ParadeStateManagementTab: React.FC = () => {
     addParadeType,
     updateParadeType,
     deleteParadeType,
+    restoreParadeType,
     isAdmin,
     showNotification,
   } = useApp();
@@ -82,6 +85,9 @@ export const ParadeStateManagementTab: React.FC = () => {
     setIsAdding(false);
   };
 
+  const activeTypes = paradeTypes.filter((t) => !t.isDeleted && !t.deleted);
+  const archivedTypes = paradeTypes.filter((t) => t.isDeleted || t.deleted);
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -97,7 +103,7 @@ export const ParadeStateManagementTab: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Configure system parade states (Morning Parade, Evening Roll Call, Games, etc.). Admins can create new parade events with customized reporting headers.
+            Configure system parade states (Morning Parade, Second Period, Games, etc.). Admins can create new parade events with customized reporting headers.
           </p>
         </div>
 
@@ -111,82 +117,147 @@ export const ParadeStateManagementTab: React.FC = () => {
         </button>
       </div>
 
-      {/* Parade States Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {paradeTypes.map((t, idx) => {
-          return (
-            <div
-              key={t.id}
-              className={`p-4 rounded-xl border flex flex-col justify-between gap-4 transition-all ${
-                t.isActive
-                  ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
-                  : 'bg-slate-950/60 border-slate-800/40 opacity-60'
-              }`}
-            >
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded">
-                      #{idx + 1}
-                    </span>
-                    <h3 className="text-sm font-bold text-white">{t.name}</h3>
+      {/* Active Parade States Grid */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-mono font-bold uppercase text-slate-300 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Active Parade States ({activeTypes.length})</span>
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {activeTypes.map((t, idx) => {
+            return (
+              <div
+                key={t.id}
+                className={`p-4 rounded-xl border flex flex-col justify-between gap-4 transition-all ${
+                  t.isActive
+                    ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                    : 'bg-slate-950/60 border-slate-800/40 opacity-60'
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded">
+                        #{idx + 1}
+                      </span>
+                      <h3 className="text-sm font-bold text-white">{t.name}</h3>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        {t.createdBy || 'Admin'}
+                      </span>
+                      <button
+                        onClick={() => updateParadeType(t.id, { isActive: !t.isActive })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                          t.isActive
+                            ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                            : 'text-slate-500 bg-slate-800 border-slate-700'
+                        }`}
+                      >
+                        {t.isActive ? 'Active' : 'Inactive'}
+                      </button>
+                    </div>
                   </div>
 
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-slate-400">Headers:</span>
+                    {(t.headings || ['OFFR', 'JCO', 'OR']).map((h) => (
+                      <span
+                        key={h}
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-semibold"
+                      >
+                        {h}
+                      </span>
+                    ))}
+                  </div>
+
+                  {t.createdByName && (
+                    <p className="text-[11px] text-slate-500 font-mono">
+                      Author: <span className="text-slate-400">{t.createdByName}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
                   <button
-                    onClick={() => updateParadeType(t.id, { isActive: !t.isActive })}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
-                      t.isActive
-                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                        : 'text-slate-500 bg-slate-800 border-slate-700'
-                    }`}
+                    onClick={() => handleOpenEdit(t)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
                   >
-                    {t.isActive ? 'Active' : 'Inactive'}
+                    <Edit2 className="w-3 h-3" />
+                    <span>Rename</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Archive / Delete Parade State "${t.name}"? Record will be safely preserved in database archive.`)) {
+                        deleteParadeType(t.id);
+                      }
+                    }}
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Soft-Delete / Archive Parade State"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] text-slate-400">Headers:</span>
-                  {(t.headings || ['OFFR', 'JCO', 'OR']).map((h) => (
-                    <span
-                      key={h}
-                      className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-semibold"
-                    >
-                      {h}
+      {/* Soft-Deleted / Archived Parade States Management (ADMIN ONLY) */}
+      {archivedTypes.length > 0 && (
+        <div className="space-y-3 pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-mono font-bold uppercase text-amber-400 flex items-center gap-2">
+              <Archive className="w-3.5 h-3.5" />
+              <span>Archived &amp; Soft-Deleted Parade States ({archivedTypes.length})</span>
+            </h3>
+            <span className="text-[11px] text-slate-500 font-mono">
+              Admin can restore archived states anytime
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {archivedTypes.map((t) => (
+              <div
+                key={t.id}
+                className="p-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/80 flex flex-col justify-between gap-3"
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-slate-400 line-through">{t.name}</h4>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                      Archived
                     </span>
-                  ))}
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    Created by: <span className="text-slate-300 font-semibold">{t.createdBy || 'Admin'}</span>
+                  </p>
+                  {t.deletedBy && (
+                    <p className="text-[10px] text-slate-600 font-mono">
+                      Deleted by: {t.deletedBy} ({t.deletedByRole})
+                    </p>
+                  )}
                 </div>
 
-                {t.createdBy && (
-                  <p className="text-[11px] text-slate-500">
-                    Created by: <span className="text-slate-400">{t.createdBy}</span>
-                  </p>
-                )}
+                <div className="flex justify-end pt-2 border-t border-slate-900">
+                  <button
+                    onClick={() => restoreParadeType(t.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-400 hover:text-white bg-emerald-500/10 hover:bg-emerald-600 border border-emerald-500/30 transition-all cursor-pointer shadow-sm"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Restore Parade State</span>
+                  </button>
+                </div>
               </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
-                <button
-                  onClick={() => handleOpenEdit(t)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
-                >
-                  <Edit2 className="w-3 h-3" />
-                  <span>Rename</span>
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm(`Delete Parade State "${t.name}"? This action cannot be undone.`)) {
-                      deleteParadeType(t.id);
-                    }
-                  }}
-                  className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors"
-                  title="Delete Parade State"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Modal */}
       {isAdding && (

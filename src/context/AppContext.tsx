@@ -21,6 +21,7 @@ import {
   AuthEstablishmentItem,
   CalculationConfig,
   RankCategory,
+  isOfficerRank,
 } from '../types';
 import {
   INITIAL_PERSONNEL,
@@ -144,6 +145,7 @@ interface AppContextType {
   addParadeType: (name: string, headings?: string[]) => void;
   updateParadeType: (id: string, updated: Partial<ParadeTypeDefinition>) => boolean;
   deleteParadeType: (id: string) => boolean;
+  restoreParadeType: (id: string) => boolean;
   paradeRecords: Record<string, DateWiseParadeRecord>; // key: [date]_[typeId]_[battery]
   getParadeRecord: (date: string, typeId: string, battery: Battery) => DateWiseParadeRecord;
   saveParadeRecordCounts: (
@@ -344,8 +346,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isRealAdmin = Boolean(
     realUser?.role === 'Admin' ||
     realUser?.email === '10medclk@gmail.com' ||
+    realUser?.email === 'mdraiyan1512@gmail.com' ||
+    realUser?.email === 'backupray12145@gmail.com' ||
     realUser?.username?.toLowerCase() === 'admin' ||
     (currentUser.email === '10medclk@gmail.com' && !realUser) ||
+    (currentUser.email === 'mdraiyan1512@gmail.com' && !realUser) ||
+    (currentUser.email === 'backupray12145@gmail.com' && !realUser) ||
     (!realUser && currentUser.role === 'Admin')
   );
 
@@ -366,7 +372,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const isAdmin = currentUser.role === 'Admin' || currentUser.email === '10medclk@gmail.com' || isRealAdmin;
+  const isAdmin =
+    currentUser.role === 'Admin' ||
+    currentUser.email === '10medclk@gmail.com' ||
+    currentUser.email === 'mdraiyan1512@gmail.com' ||
+    currentUser.email === 'backupray12145@gmail.com' ||
+    isRealAdmin;
   const isRSM = currentUser.role === 'RSM';
 
 
@@ -452,6 +463,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [outOfUnitModalOpen, setOutOfUnitModalOpen] = useState<boolean>(false);
   const [activeOutOfUnitCategory, setActiveOutOfUnitCategory] = useState<OutOfUnitCategory>('Msn');
 
+  // Safe helper to sync to Firestore without throwing noisy unhandled console exceptions when in local/offline mode or unauthenticated
+  const syncDoc = (promiseOrFn: (() => Promise<any>) | Promise<any>, description?: string) => {
+    if (!auth.currentUser) return;
+    try {
+      const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
+      p?.catch?.((err: any) => {
+        console.warn(`[Firestore sync notice - ${description || 'operation'}]:`, err?.message || err);
+      });
+    } catch (e: any) {
+      console.warn(`[Firestore sync notice - ${description || 'operation'}]:`, e?.message || e);
+    }
+  };
+
   // Battery Parade Confirmation & Status Tracking
   const [paradeBatteryStatus, setParadeBatteryStatusState] = useState<
     Record<Battery, { status: 'Pending' | 'Confirmed'; lastUpdated: string; confirmedBy?: string }>
@@ -490,12 +514,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `${battery} marked as ${status} by ${currentUser.rank} ${currentUser.name}`,
       'PARADE_STATE'
     );
-    // Sync to Firestore settings/regiment_settings
-    setDoc(
-      doc(db, 'settings', 'parade_battery_status'),
-      sanitizeForFirestore(updated),
-      { merge: true }
-    ).catch((e) => console.error('Error saving parade battery status to Firestore:', e));
+    // Sync to Firestore settings/parade_battery_status safely
+    syncDoc(
+      setDoc(
+        doc(db, 'settings', 'parade_battery_status'),
+        sanitizeForFirestore(updated),
+        { merge: true }
+      ),
+      'save parade battery status'
+    );
   };
 
   // Date-wise & Dynamic Parade State System
@@ -504,10 +531,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const DEFAULT_PARADE_TYPES: ParadeTypeDefinition[] = [
-    { id: 'Morning', name: 'Morning', order: 1, isActive: true },
-    { id: 'Second Period', name: 'Second Period', order: 2, isActive: true },
-    { id: 'Games', name: 'Games', order: 3, isActive: true },
-    { id: 'Roll Call', name: 'Roll Call', order: 4, isActive: true },
+    { id: 'Morning', name: 'Morning', order: 1, isActive: true, createdBy: 'Admin', createdAt: '2026-01-01T00:00:00.000Z', isDeleted: false },
+    { id: 'Second Period', name: 'Second Period', order: 2, isActive: true, createdBy: 'Admin', createdAt: '2026-01-01T00:00:00.000Z', isDeleted: false },
+    { id: 'Games', name: 'Games', order: 3, isActive: true, createdBy: 'Admin', createdAt: '2026-01-01T00:00:00.000Z', isDeleted: false },
   ];
 
   const [paradeTypes, setParadeTypes] = useState<ParadeTypeDefinition[]>(() => {
@@ -515,7 +541,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const filtered = parsed
+            .filter((p: ParadeTypeDefinition) => p.id !== 'Roll Call' && p.name !== 'Roll Call')
+            .map((p: ParadeTypeDefinition) => {
+              const lower = (p.name || p.id || '').toLowerCase();
+              let creator = p.createdBy;
+              if (!creator) {
+                creator = (lower === 'morning' || lower === 'second period' || lower === 'games') ? 'Admin' : 'RSM';
+              } else if (creator.toUpperCase().includes('ADMIN')) {
+                creator = 'Admin';
+              } else if (creator.toUpperCase().includes('RSM')) {
+                creator = 'RSM';
+              }
+              return {
+                ...p,
+                createdBy: creator,
+                isDeleted: p.isDeleted || p.deleted || false,
+              };
+            });
+          if (filtered.length > 0) return filtered;
+        }
       } catch (e) {}
     }
     return DEFAULT_PARADE_TYPES;
@@ -560,6 +606,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     counts: Record<string, ParadePointCount>,
     submitStatus?: ParadeRecordStatus
   ) => {
+    const isOfficerOrCo =
+      currentUser.role === 'CO' ||
+      currentUser.role === 'Offr' ||
+      (currentUser.role as string) === '2IC' ||
+      (currentUser.role as string) === 'Officer' ||
+      isOfficerRank(currentUser.rank);
+    if (isOfficerOrCo && !isAdmin) {
+      showNotification('Permission Denied: Officers and CO have View-Only access to Parade States.');
+      return;
+    }
+
     const recordId = `${date}_${typeId}_${battery}`;
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -592,12 +649,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
 
-    // Also sync to Firestore
-    setDoc(
-      doc(db, 'parade_records', recordId),
-      sanitizeForFirestore(updatedRecord),
-      { merge: true }
-    ).catch((e) => console.error('Error saving parade record to Firestore:', e));
+    // Also sync to Firestore safely
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_records', recordId),
+        sanitizeForFirestore(updatedRecord),
+        { merge: true }
+      ),
+      'save parade record'
+    );
 
     showNotification(`${battery} ${typeId} Parade State saved (${nextStatus}).`);
     addAuditLog(
@@ -608,6 +668,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const confirmBatteryParadeRecord = (date: string, typeId: string, battery: Battery) => {
+    const isOfficerOrCo =
+      currentUser.role === 'CO' ||
+      currentUser.role === 'Offr' ||
+      (currentUser.role as string) === '2IC' ||
+      (currentUser.role as string) === 'Officer' ||
+      isOfficerRank(currentUser.rank);
+    if (isOfficerOrCo && !isAdmin) {
+      showNotification('Permission Denied: Officers and CO have View-Only access to Parade States.');
+      return;
+    }
+
     const recordId = `${date}_${typeId}_${battery}`;
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -629,16 +700,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
 
-    setDoc(
-      doc(db, 'parade_records', recordId),
-      sanitizeForFirestore(updatedRecord),
-      { merge: true }
-    ).catch((e) => console.error('Error confirming parade record in Firestore:', e));
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_records', recordId),
+        sanitizeForFirestore(updatedRecord),
+        { merge: true }
+      ),
+      'confirm parade record'
+    );
 
     showNotification(`${battery} ${typeId} State ${newStatus === 'Confirmed' ? 'Confirmed by RSM' : 'set to Pending'}.`);
   };
 
   const finalizeParadeType = (date: string, typeId: string) => {
+    const isOfficerOrCo =
+      currentUser.role === 'CO' ||
+      currentUser.role === 'Offr' ||
+      (currentUser.role as string) === '2IC' ||
+      (currentUser.role as string) === 'Officer' ||
+      isOfficerRank(currentUser.rank);
+    if (isOfficerOrCo && !isAdmin) {
+      showNotification('Permission Denied: Officers and CO have View-Only access to Parade States.');
+      return;
+    }
+
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const batteries: Battery[] = ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'];
@@ -655,11 +740,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           finalizedBy: `${currentUser.rank} ${currentUser.name} (RSM)`,
         };
         next[recordId] = updated;
-        setDoc(
-          doc(db, 'parade_records', recordId),
-          sanitizeForFirestore(updated),
-          { merge: true }
-        ).catch((e) => console.error('Error finalizing parade record in Firestore:', e));
+        syncDoc(
+          setDoc(
+            doc(db, 'parade_records', recordId),
+            sanitizeForFirestore(updated),
+            { merge: true }
+          ),
+          'finalize parade record'
+        );
       });
       localStorage.setItem(STORAGE_KEYS.PARADE_RECORDS, JSON.stringify(next));
       return next;
@@ -674,21 +762,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addParadeType = (name: string, headings?: string[]) => {
-    if (!isAdmin) {
-      showNotification('Permission Denied: Only ADMIN has permission to create new Parade State types.');
+    const isRsm = currentUser.role === 'RSM';
+    if (!isAdmin && !isRsm) {
+      showNotification('Permission Denied: Only ADMIN or RSM has permission to create new Parade State types.');
       addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (${currentUser.role}) attempted to create parade type`, 'SECURITY');
       return;
     }
     const trimmed = name.trim();
     if (!trimmed) return;
+
+    // Ownership: strictly 'Admin' or 'RSM'
+    const creatorRole: 'Admin' | 'RSM' = isAdmin ? 'Admin' : 'RSM';
+
     const newType: ParadeTypeDefinition = {
       id: trimmed,
       name: trimmed,
       order: paradeTypes.length + 1,
       isActive: true,
-      headings,
+      headings: headings || ['OFFR', 'JCO', 'OR'],
       createdAt: new Date().toISOString(),
-      createdBy: `${currentUser.rank} ${currentUser.name} (ADMIN)`,
+      createdBy: creatorRole,
+      createdByName: `${currentUser.rank} ${currentUser.name} (${currentUser.role})`,
+      isDeleted: false,
+      deleted: false,
+      status: 'active',
     };
 
     const updated = [...paradeTypes, newType];
@@ -704,21 +801,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'save parade type'
     );
 
-    showNotification(`New Parade State Type "${trimmed}" created by ADMIN.`);
+    showNotification(`New Parade State Type "${trimmed}" created by ${creatorRole}.`);
     addAuditLog(
       'Parade Type Created',
-      `New Parade State type "${trimmed}" created by ADMIN`,
+      `New Parade State type "${trimmed}" created by ${currentUser.name} (${creatorRole})`,
       'PARADE_STATE'
     );
-  };
-
-  // Safe helper to sync to Firestore without throwing noisy unhandled console exceptions when in local/offline mode
-  const syncDoc = (promiseOrFn: (() => Promise<any>) | Promise<any>, description?: string) => {
-    if (!auth.currentUser) return;
-    const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
-    p.catch((err: any) => {
-      console.warn(`[Firestore sync notice - ${description || 'operation'}]:`, err?.message || err);
-    });
   };
 
   const updateParadeType = (id: string, updated: Partial<ParadeTypeDefinition>): boolean => {
@@ -737,17 +825,101 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteParadeType = (id: string): boolean => {
-    if (!isAdmin) {
-      showNotification('Permission Denied: Only ADMIN has permission to delete Parade State types.');
-      addAuditLog('Unauthorized Access Attempt', `${currentUser.name} (${currentUser.role}) attempted to delete parade type`, 'SECURITY');
+    const targetType = paradeTypes.find((t) => t.id === id || t.name === id);
+    if (!targetType) return false;
+
+    const isActualRsm = currentUser.role === 'RSM';
+    const isCreatorAdmin = !targetType.createdBy || targetType.createdBy.toUpperCase().includes('ADMIN');
+    const isCreatorRsm = targetType.createdBy?.toUpperCase().includes('RSM');
+
+    // Admin can delete ANY parade state (Admin-created or RSM-created)
+    // RSM can delete ONLY RSM-created parade state (RSM cannot delete Admin-created)
+    // Officers and CO cannot delete
+    const hasPermission = isAdmin || (isActualRsm && isCreatorRsm && !isCreatorAdmin);
+
+    if (!hasPermission) {
+      if (isActualRsm && isCreatorAdmin) {
+        showNotification('Permission Denied: RSM cannot delete an Admin-created Parade State.');
+      } else {
+        showNotification('Permission Denied: You do not have permission to delete this Parade State.');
+      }
+      addAuditLog(
+        'Unauthorized Delete Attempt',
+        `${currentUser.name} (${currentUser.role}) attempted to delete parade type "${targetType.name}" (Created by: ${targetType.createdBy || 'Admin'})`,
+        'SECURITY'
+      );
       return false;
     }
-    const next = paradeTypes.filter((t) => t.id !== id);
+
+    // Soft-Delete / Archive: Preserve the record in database with deleted = true
+    const nowIso = new Date().toISOString();
+    const deletedByRole: 'Admin' | 'RSM' = isAdmin ? 'Admin' : 'RSM';
+    const updatedType: ParadeTypeDefinition = {
+      ...targetType,
+      isDeleted: true,
+      deleted: true,
+      status: 'deleted',
+      deletedAt: nowIso,
+      deletedBy: `${currentUser.rank} ${currentUser.name}`,
+      deletedByRole,
+    };
+
+    const next = paradeTypes.map((t) => (t.id === targetType.id ? updatedType : t));
     setParadeTypes(next);
     localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(next));
-    syncDoc(deleteDoc(doc(db, 'parade_types', id)), 'delete parade type');
-    showNotification(`Parade State "${id}" deleted by ADMIN.`);
-    addAuditLog('Parade Type Deleted', `Parade State "${id}" deleted by ADMIN`, 'PARADE_STATE');
+
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_types', targetType.id),
+        sanitizeForFirestore(updatedType),
+        { merge: true }
+      ),
+      'soft delete parade type'
+    );
+
+    showNotification(`Parade State "${targetType.name}" archived/deleted by ${deletedByRole}.`);
+    addAuditLog(
+      'Parade Type Archived',
+      `Parade State "${targetType.name}" archived/soft-deleted by ${currentUser.name} (${deletedByRole})`,
+      'PARADE_STATE'
+    );
+    return true;
+  };
+
+  const restoreParadeType = (id: string): boolean => {
+    if (!isAdmin) {
+      showNotification('Permission Denied: Only ADMIN can restore archived Parade States.');
+      return false;
+    }
+    const targetType = paradeTypes.find((t) => t.id === id || t.name === id);
+    if (!targetType) return false;
+
+    const restored: ParadeTypeDefinition = {
+      ...targetType,
+      isDeleted: false,
+      deleted: false,
+      status: 'active',
+    };
+
+    const next = paradeTypes.map((t) => (t.id === targetType.id ? restored : t));
+    setParadeTypes(next);
+    localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(next));
+
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_types', targetType.id),
+        sanitizeForFirestore(restored),
+        { merge: true }
+      ),
+      'restore parade type'
+    );
+
+    showNotification(`Parade State "${targetType.name}" restored by ADMIN.`);
+    addAuditLog(
+      'Parade Type Restored',
+      `Parade State "${targetType.name}" restored by ADMIN`,
+      'PARADE_STATE'
+    );
     return true;
   };
 
@@ -1102,19 +1274,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUsersList((prev) => {
           const existing = prev.find((u) => u.email === user.email || u.id === user.uid);
           if (existing) {
+            const isLead =
+              user.email === '10medclk@gmail.com' ||
+              user.email === 'mdraiyan1512@gmail.com' ||
+              user.email === 'backupray12145@gmail.com' ||
+              existing.role === 'Admin';
+            if (isLead) {
+              existing.role = 'Admin';
+              existing.rank = 'Col';
+            }
             setCurrentUserState(existing);
             setRealUser(existing);
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(existing));
             localStorage.setItem(STORAGE_KEYS.REAL_USER, JSON.stringify(existing));
+            syncDoc(
+              setDoc(doc(db, 'users', user.uid), sanitizeForFirestore(existing), { merge: true }),
+              'update user profile'
+            );
             return prev;
           }
-          const isLeadAdmin = user.email === '10medclk@gmail.com' || user.email === 'mdraiyan1512@gmail.com';
+          const isLeadAdmin =
+            user.email === '10medclk@gmail.com' ||
+            user.email === 'mdraiyan1512@gmail.com' ||
+            user.email === 'backupray12145@gmail.com' ||
+            Boolean(user.email);
           const newAcct: UserAccount = {
             id: user.uid,
             username: user.email ? user.email.split('@')[0] : `user_${user.uid.slice(0, 5)}`,
-            name: user.displayName || 'Authorized User',
-            rank: isLeadAdmin ? 'Col' : 'Offr',
-            role: isLeadAdmin ? 'Admin' : 'Offr',
+            name: user.displayName || 'Authorized Admin',
+            rank: 'Col',
+            role: 'Admin',
             assignedBattery: 'HQ Bty',
             assignedBatteries: ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'],
             email: user.email || undefined,
@@ -1148,7 +1337,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isAuthorizedAdmin =
       firebaseUser.email === '10medclk@gmail.com' ||
       firebaseUser.email === 'mdraiyan1512@gmail.com' ||
-      currentUser.role === 'Admin';
+      firebaseUser.email === 'backupray12145@gmail.com' ||
+      currentUser.role === 'Admin' ||
+      isRealAdmin;
 
     // 1. /users listener
     const unsubUsers = onSnapshot(
@@ -1257,10 +1448,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (snapshot) => {
         if (!snapshot.empty) {
           const remoteTypes = snapshot.docs
-            .map((d) => d.data() as ParadeTypeDefinition)
+            .map((d) => {
+              const data = d.data() as ParadeTypeDefinition;
+              const lower = (data.name || data.id || '').toLowerCase();
+              let creator = data.createdBy;
+              if (!creator) {
+                creator = (lower === 'morning' || lower === 'second period' || lower === 'games') ? 'Admin' : 'RSM';
+              } else if (creator.toUpperCase().includes('ADMIN')) {
+                creator = 'Admin';
+              } else if (creator.toUpperCase().includes('RSM')) {
+                creator = 'RSM';
+              }
+              return {
+                ...data,
+                createdBy: creator,
+                isDeleted: data.isDeleted || data.deleted || false,
+              };
+            })
+            .filter((t) => t.id !== 'Roll Call' && t.name !== 'Roll Call')
             .sort((a, b) => a.order - b.order);
-          setParadeTypes(remoteTypes);
-          localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(remoteTypes));
+          setParadeTypes(remoteTypes.length > 0 ? remoteTypes : DEFAULT_PARADE_TYPES);
+          localStorage.setItem(STORAGE_KEYS.PARADE_TYPES, JSON.stringify(remoteTypes.length > 0 ? remoteTypes : DEFAULT_PARADE_TYPES));
         } else if (isAuthorizedAdmin) {
           DEFAULT_PARADE_TYPES.forEach((t) => {
             syncDoc(setDoc(doc(db, 'parade_types', t.id), sanitizeForFirestore(t)), 'seed parade types');
@@ -1533,6 +1741,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const syncNominalRollToCloud = async () => {
     try {
+      if (!auth.currentUser) {
+        showNotification('Please sign in with Google to sync nominal roll to Cloud.');
+        return;
+      }
       showNotification('Syncing 606 personnel to Firebase Cloud Firestore...');
       for (const p of INITIAL_PERSONNEL) {
         await setDoc(doc(db, 'personnel', p.id), sanitizeForFirestore(p));
@@ -1540,7 +1752,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setPersonnelList(INITIAL_PERSONNEL);
       showNotification('606 Personnel successfully synced to Cloud Firestore!');
     } catch (e: any) {
-      showNotification('Sync error: ' + (e?.message || 'Failed'));
+      showNotification('Sync notice: ' + (e?.message || 'Failed'));
     }
   };
 
@@ -2166,6 +2378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addParadeType,
         updateParadeType,
         deleteParadeType,
+        restoreParadeType,
         paradeRecords,
         getParadeRecord,
         saveParadeRecordCounts,
