@@ -184,6 +184,12 @@ interface AppContextType {
   loginWithCredentials: (username: string, password: string) => { success: boolean; error?: string };
   logout: () => Promise<void>;
 
+  // Role Simulation & Admin Persistence
+  isRealAdmin: boolean;
+  isSimulating: boolean;
+  realUser: UserAccount | null;
+  exitSimulation: () => void;
+
   // Firebase Auth & Cloud Sync
   firebaseUser: FirebaseUser | null;
   isFirebaseReady: boolean;
@@ -195,6 +201,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const STORAGE_KEYS = {
   PERSONNEL: '10med_personnel_v5',
   USER: '10med_currentUser_v1',
+  REAL_USER: '10med_real_user_v2',
   USERS_LIST: '10med_users_v2',
   DUTY: '10med_duty_v1',
   LOGS: '10med_logs_v1',
@@ -255,6 +262,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_USERS[0]; // Default to CO
   });
 
+  // The genuinely authenticated user account (prior to any role simulation)
+  const [realUser, setRealUser] = useState<UserAccount | null>(() => {
+    const savedReal = localStorage.getItem(STORAGE_KEYS.REAL_USER);
+    if (savedReal) {
+      try {
+        return JSON.parse(savedReal);
+      } catch (e) {
+        /* fallback */
+      }
+    }
+    const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
+    if (savedUser) {
+      try {
+        const u = JSON.parse(savedUser);
+        if (u && (u.role === 'Admin' || u.email === '10medclk@gmail.com' || u.username === 'admin')) {
+          return u;
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+
   // Dynamic Categories & Sub-Categories (Database-Driven, controlled by Admin)
   const [categoriesList, setCategoriesList] = useState<SystemCategory[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SYSTEM_CATEGORIES);
@@ -310,8 +339,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_CALCULATION_CONFIG;
   });
 
-  // Role permissions
-  const isAdmin = currentUser.role === 'Admin' || currentUser.email === '10medclk@gmail.com';
+  // Role permissions & Simulation State
+  // isRealAdmin stays true for the logged-in Administrator regardless of simulated role
+  const isRealAdmin = Boolean(
+    realUser?.role === 'Admin' ||
+    realUser?.email === '10medclk@gmail.com' ||
+    realUser?.username?.toLowerCase() === 'admin' ||
+    (currentUser.email === '10medclk@gmail.com' && !realUser) ||
+    (!realUser && currentUser.role === 'Admin')
+  );
+
+  // Active when a genuine Admin is currently simulating another role (e.g. CO, RSM, BSM)
+  const isSimulating = Boolean(
+    isRealAdmin && (currentUser.role !== 'Admin' || (realUser && currentUser.id !== realUser.id))
+  );
+
+  const exitSimulation = () => {
+    if (!isRealAdmin) return;
+    const adminUser = realUser || usersList.find((u) => u.role === 'Admin') || INITIAL_USERS.find((u) => u.role === 'Admin');
+    if (adminUser) {
+      setCurrentUserState(adminUser);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(adminUser));
+      setActivePage('admin_panel');
+      showNotification('এডমিন মোডে ফিরে আসা হয়েছে। রোল সিমুলেশন বন্ধ হয়েছে।');
+      addAuditLog('Role Switch', `Admin exited simulation mode and returned to Admin panel`, 'SECURITY');
+    }
+  };
+
+  const isAdmin = currentUser.role === 'Admin' || currentUser.email === '10medclk@gmail.com' || isRealAdmin;
   const isRSM = currentUser.role === 'RSM';
 
 
@@ -1042,11 +1097,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
       if (user) {
+        setIsAuthenticated(true);
         // Link with existing user or create/update profile
         setUsersList((prev) => {
           const existing = prev.find((u) => u.email === user.email || u.id === user.uid);
           if (existing) {
             setCurrentUserState(existing);
+            setRealUser(existing);
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(existing));
+            localStorage.setItem(STORAGE_KEYS.REAL_USER, JSON.stringify(existing));
             return prev;
           }
           const isLeadAdmin = user.email === '10medclk@gmail.com' || user.email === 'mdraiyan1512@gmail.com';
@@ -1063,6 +1122,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lastLogin: new Date().toISOString(),
           };
           setCurrentUserState(newAcct);
+          setRealUser(newAcct);
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newAcct));
+          localStorage.setItem(STORAGE_KEYS.REAL_USER, JSON.stringify(newAcct));
           // Persist user to Firestore
           syncDoc(setDoc(doc(db, 'users', user.uid), sanitizeForFirestore(newAcct)), 'new user account');
           return [newAcct, ...prev];
@@ -1346,6 +1408,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loginWithGoogle = async () => {
     try {
       const user = await signInWithGoogle();
+      setIsAuthenticated(true);
+      setActivePage('main_dashboard');
       showNotification(`Signed in with Google: ${user.displayName || user.email}`);
       addAuditLog('Google OAuth Login', `User authenticated: ${user.email}`, 'SECURITY');
     } catch (err: any) {
@@ -1394,13 +1458,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Login successful
     setCurrentUserState(user);
+    setRealUser(user);
     setIsAuthenticated(true);
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEYS.REAL_USER, JSON.stringify(user));
     localStorage.setItem(STORAGE_KEYS.AUTH_STATUS, 'true');
 
     // Route to designated dashboard based on role
-    if (user.role === 'CO') {
-      setActivePage('co_dashboard');
+    if (user.role === 'CO' || user.role === 'Offr') {
+      setActivePage('main_dashboard');
     } else if (user.role === 'RSM') {
       setActivePage('rsm_dashboard');
     } else if (user.role === 'Admin') {
@@ -1435,6 +1501,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Firebase logout warning:', err);
     }
     setIsAuthenticated(false);
+    setRealUser(null);
+    localStorage.removeItem(STORAGE_KEYS.REAL_USER);
+    localStorage.removeItem(STORAGE_KEYS.USER);
     localStorage.removeItem(STORAGE_KEYS.AUTH_STATUS);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_PAGE);
     setActivePage('login');
@@ -1497,6 +1566,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const switchRole = (role: Role, battery?: Battery) => {
+    if (!isRealAdmin) {
+      showNotification('শুধুমাত্র এডমিন সিমুলেটর ব্যবহার করতে পারেন।');
+      return;
+    }
     const matchingUser = usersList.find((u) => u.role === role) || INITIAL_USERS.find((u) => u.role === role);
     if (matchingUser) {
       let defaultBty: Battery | undefined = battery || matchingUser.assignedBattery;
@@ -1511,10 +1584,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         assignedBattery: defaultBty,
       };
       setCurrentUserState(updatedUser);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+
+      // Auto-route to corresponding role dashboard
+      if (role === 'CO' || role === 'Offr') {
+        setActivePage('main_dashboard');
+      } else if (role === 'RSM') {
+        setActivePage('rsm_dashboard');
+      } else if (role === 'Admin') {
+        setActivePage('admin_panel');
+      } else if (['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(role)) {
+        if (defaultBty) setSelectedBatteryFilter(defaultBty);
+        setActivePage('battery_dashboard');
+      } else {
+        setActivePage('main_dashboard');
+      }
+
       showNotification(
-        `Active Role changed to ${role}${updatedUser.assignedBattery ? ` (${updatedUser.assignedBattery})` : ''}`
+        `সিমুলেশন মোড: সক্রিয় রোল পরিবর্তিত হয়েছে ${role}${updatedUser.assignedBattery ? ` (${updatedUser.assignedBattery})` : ''}`
       );
-      addAuditLog('Role Switch', `Switched view mode to ${role}`, 'SECURITY');
+      addAuditLog('Role Switch', `Admin switched simulation view mode to ${role}`, 'SECURITY');
     }
   };
 
@@ -2096,6 +2185,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         isAuthenticated,
         loginWithCredentials,
+
+        isRealAdmin,
+        isSimulating,
+        realUser,
+        exitSimulation,
 
         firebaseUser,
         isFirebaseReady,

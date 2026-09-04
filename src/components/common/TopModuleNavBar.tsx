@@ -5,7 +5,6 @@ import {
   Users,
   Building2,
   ClipboardList,
-  Edit3,
   Settings,
 } from 'lucide-react';
 
@@ -14,7 +13,6 @@ export const TopModuleNavBar: React.FC = () => {
     activePage,
     setActivePage,
     currentUser,
-    setDailyParadeModalOpen,
   } = useApp();
 
   const role = currentUser.role;
@@ -50,13 +48,6 @@ export const TopModuleNavBar: React.FC = () => {
       label: 'Regt Nominal',
       icon: Users,
     });
-    tabs.push({
-      id: 'data_update',
-      label: 'Data Update',
-      icon: Edit3,
-      badge: 'Edit',
-      action: () => setDailyParadeModalOpen(true),
-    });
   } else if (isRsm) {
     tabs.push({
       id: 'main_dashboard',
@@ -73,18 +64,16 @@ export const TopModuleNavBar: React.FC = () => {
       label: 'Regt Nominal',
       icon: Users,
     });
-    tabs.push({
-      id: 'data_update',
-      label: 'Data Update',
-      icon: Edit3,
-      badge: 'Edit',
-      action: () => setDailyParadeModalOpen(true),
-    });
   } else if (isCoOrOffr) {
     tabs.push({
       id: 'main_dashboard',
       label: 'Main Dashboard',
       icon: LayoutDashboard,
+    });
+    tabs.push({
+      id: 'battery_dashboard',
+      label: 'Bty Dashboard',
+      icon: Building2,
     });
     tabs.push({
       id: 'parade_state',
@@ -117,13 +106,6 @@ export const TopModuleNavBar: React.FC = () => {
       id: 'master_personnel',
       label: 'Regt Nominal',
       icon: Users,
-    });
-    tabs.push({
-      id: 'data_update',
-      label: 'Data Update',
-      icon: Edit3,
-      badge: 'Edit',
-      action: () => setDailyParadeModalOpen(true),
     });
     tabs.push({
       id: 'admin_panel',

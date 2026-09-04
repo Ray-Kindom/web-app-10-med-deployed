@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Battery } from '../../types';
-import { Building, CheckCircle2, AlertTriangle, Printer, Layers, ExternalLink } from 'lucide-react';
+import { Building, CheckCircle2, AlertTriangle, Layers, ExternalLink } from 'lucide-react';
 
 interface ParadeStateSummaryGridProps {
   onSelectBattery?: (bty: Battery) => void;
@@ -40,16 +40,6 @@ export const ParadeStateSummaryGrid: React.FC<ParadeStateSummaryGridProps> = ({
             </span>
           </div>
         </div>
-
-        {onOpenPrintModal && (
-          <button
-            onClick={onOpenPrintModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors self-start sm:self-auto"
-          >
-            <Printer className="w-3.5 h-3.5 text-rose-400" />
-            <span>Print Sheet</span>
-          </button>
-        )}
       </div>
 
       <div className="overflow-x-auto">

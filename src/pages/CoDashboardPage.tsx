@@ -7,7 +7,6 @@ import { Personnel } from '../types';
 import {
   Eye,
   Shield,
-  Printer,
   Sparkles,
   CheckCircle2,
   AlertTriangle,
@@ -47,24 +46,13 @@ export const CoDashboardPage: React.FC<CoDashboardPageProps> = ({
               <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
                 Commanding Officer (CO) Executive Console
               </span>
-              <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded flex items-center gap-1">
-                <Eye className="w-3 h-3 text-amber-400" />
-                <span>Read-Only Strategic View</span>
+              <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                LIVE MORNING STATE
               </span>
             </div>
             <h1 className="text-2xl font-black text-white tracking-tight font-serif">
               State of the Regiment — Executive Summary
             </h1>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onOpenPrintModal}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white text-xs font-bold shadow-lg shadow-amber-950/50 transition-all"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Print Regimental Morning State</span>
-            </button>
           </div>
         </div>
 
@@ -217,10 +205,10 @@ export const CoDashboardPage: React.FC<CoDashboardPageProps> = ({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-white uppercase font-mono tracking-wider flex items-center gap-2">
             <Eye className="w-4 h-4 text-amber-400" />
-            <span>Regimental Nominal Roll (Read-Only Inspection Mode)</span>
+            <span>Regimental Nominal Roll — Command Inspection</span>
           </h2>
           <span className="text-xs text-amber-400 font-mono">
-            Edits Restricted to Adjutant & BSM
+            Full Regimental Strength
           </span>
         </div>
 

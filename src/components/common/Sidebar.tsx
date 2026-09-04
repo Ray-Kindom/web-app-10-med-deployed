@@ -29,6 +29,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     getRegimentalTotals,
     setDailyParadeModalOpen,
     setSelectedBatteryFilter,
+    isRealAdmin,
+    isSimulating,
+    exitSimulation,
   } = useApp();
 
   const totals = getRegimentalTotals();
@@ -139,6 +142,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     });
     items.push({
+      id: 'battery_dashboard',
+      label: 'Bty Dashboard',
+      description: 'Sub-unit Battery Controls',
+      icon: Building2,
+      badge: '4 Btys',
+      badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+    });
+    items.push({
       id: 'parade_state',
       label: 'Parade State Dashboard',
       description: 'Morning & Evening Muster Roll',
@@ -207,6 +218,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     });
   }
 
+  // If real admin is currently simulating another role, ensure Admin Panel is accessible
+  if (isRealAdmin && !items.some((i) => i.id === 'admin_panel')) {
+    items.push({
+      id: 'admin_panel',
+      label: 'Admin Panel',
+      description: 'এডমিন কন্ট্রোল ও সেটিংস',
+      icon: Settings,
+      badge: 'Admin',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
+    });
+  }
+
   const handleNavClick = (item: NavItem) => {
     if (item.action) {
       item.action();
@@ -237,6 +260,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Command Navigation</span>
             <span className="text-slate-400">{currentUser.role} View</span>
           </div>
+
+          {isSimulating && (
+            <div className="mx-1 mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-1.5 font-bold font-mono text-[11px] text-amber-300">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                  <span>SIMULATING: {currentUser.role}</span>
+                </div>
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                  Test View
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-200/80 mb-2">
+                সিমুলেশন চলছে। অ্যাডমিন রোল-এ ফিরে যেতে নিচের বাটনে ক্লিক করুন:
+              </p>
+              <button
+                onClick={() => {
+                  exitSimulation();
+                  onCloseMobile();
+                }}
+                className="w-full py-1.5 px-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-sm"
+              >
+                <span>Exit Simulation (এডমিনে ফিরুন)</span>
+              </button>
+            </div>
+          )}
 
           {items.map((item) => {
             const Icon = item.icon;

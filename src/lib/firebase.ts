@@ -45,7 +45,7 @@ export const db =
 // Connectivity check as per Firebase guidelines
 export const testFirestoreConnection = async (): Promise<boolean> => {
   try {
-    await getDocFromServer(doc(db, 'settings', 'connection_test'));
+    await getDocFromServer(doc(db, 'test', 'connection'));
     return true;
   } catch (error: any) {
     if (error?.message?.includes('the client is offline') || error?.code === 'unavailable') {
@@ -56,6 +56,11 @@ export const testFirestoreConnection = async (): Promise<boolean> => {
     return true;
   }
 };
+
+// Test connection on boot
+testFirestoreConnection().catch((err) => {
+  console.warn('[Firebase] Initial connection check:', err?.message || err);
+});
 
 // Authentication Helpers
 export const signInWithGoogle = async (): Promise<FirebaseUser> => {

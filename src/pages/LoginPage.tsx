@@ -13,10 +13,12 @@ import {
   Shield,
   X,
   KeyRound,
+  Cloud,
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { usersList, loginWithCredentials } = useApp();
+  const { usersList, loginWithCredentials, loginWithGoogle } = useApp();
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
   const [password, setPassword] = useState('');
@@ -224,6 +226,26 @@ export const LoginPage: React.FC = () => {
             </button>
           </form>
         )}
+
+        {/* Google Cloud Sign-In Option */}
+        <div className="pt-2 border-t border-slate-800/80 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              setIsGoogleLoading(true);
+              try {
+                await loginWithGoogle();
+              } finally {
+                setIsGoogleLoading(false);
+              }
+            }}
+            disabled={isGoogleLoading}
+            className="w-full max-w-sm py-2 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          >
+            <Cloud className="w-4 h-4 text-emerald-400" />
+            <span>{isGoogleLoading ? 'Connecting to Google...' : 'Sign in with Google (Firebase Cloud)'}</span>
+          </button>
+        </div>
 
         {/* Security Notice */}
         <div className="pt-2 border-t border-slate-800/80 text-center text-[10px] text-slate-500 flex items-center justify-center gap-1 font-mono">

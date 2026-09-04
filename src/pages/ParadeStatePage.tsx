@@ -139,8 +139,10 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
         </div>
       </div>
 
-      {/* Updt Out Of Unit Action Control Box (PRESERVED EXACTLY AS EXISTING) */}
-      <ParadeActionControls battery={isBsm ? assignedBty : undefined} />
+      {/* Updt Out Of Unit Action Control Box (Only accessible to RSM and BSM) */}
+      {(isBsm || isRsm) && (
+        <ParadeActionControls battery={isBsm ? assignedBty : undefined} />
+      )}
 
       {/* Quick Category Action Cards for Lve, Course, CMH/Sick, COMD */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

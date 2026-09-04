@@ -12,9 +12,17 @@ interface ParadeActionControlsProps {
 
 export const ParadeActionControls: React.FC<ParadeActionControlsProps> = ({ battery }) => {
   const {
+    currentUser,
     setOutOfUnitModalOpen,
     personnelList,
   } = useApp();
+
+  const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
+  const isRsm = currentUser.role === 'RSM' || currentUser.role === 'Admin';
+
+  if (!isBsm && !isRsm) {
+    return null;
+  }
 
   const outOfUnitCount = personnelList.filter((p) => {
     if (battery && p.battery !== battery) return false;

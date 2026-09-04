@@ -7,7 +7,6 @@ import {
   Clock,
   UserCheck,
   ChevronDown,
-  Printer,
   Search,
   Bell,
   LogOut,
@@ -35,6 +34,9 @@ export const Header: React.FC<HeaderProps> = ({
     firebaseUser,
     isFirebaseReady,
     logout,
+    isRealAdmin,
+    isSimulating,
+    exitSimulation,
   } = useApp();
 
   const [militaryTime, setMilitaryTime] = useState<string>('');
@@ -72,6 +74,24 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white">
+      {/* Simulation Active Notice Banner for Admin */}
+      {isSimulating && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-200 px-4 py-1 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+            <span className="font-semibold text-amber-300">
+              এডমিন রোল সিমুলেটর সক্রিয়: বর্তমানে <span className="underline font-bold">{currentUser.role}</span> {currentUser.assignedBattery ? `(${currentUser.assignedBattery})` : ''} প্রোফাইলে আছেন
+            </span>
+          </div>
+          <button
+            onClick={exitSimulation}
+            className="px-2.5 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] transition-colors cursor-pointer"
+          >
+            এডমিন মোডে ফিরুন (Exit)
+          </button>
+        </div>
+      )}
+
       {/* Top Banner alert if notification */}
       {notification && (
         <div className="bg-rose-600/90 text-white text-xs font-medium px-4 py-1.5 flex items-center justify-center gap-2 border-b border-rose-400/40">
@@ -143,28 +163,30 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{militaryTime}</span>
             </div>
 
-            {/* Quick Print Parade State */}
-            {onOpenPrintModal && (
-              <button
-                onClick={onOpenPrintModal}
-                title="Print Official Morning Parade State"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-medium transition-colors"
-              >
-                <Printer className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden sm:inline">Print State</span>
-              </button>
-            )}
-
-            {/* Role Switcher Dropdown - RESTRICTED TO ADMIN ONLY */}
-            {currentUser.role === 'Admin' && (
+            {/* Role Switcher Dropdown - PERSISTENT FOR REAL ADMIN THROUGHOUT THE ENTIRE SESSION */}
+            {isRealAdmin && (
               <div className="relative">
                 <button
                   onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                  title="Admin Role Simulation"
-                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-850 hover:to-slate-750 border border-slate-700 text-xs font-medium text-slate-200 shadow-sm"
+                  title={
+                    isSimulating
+                      ? `সিমুলেশন চলছে: ${currentUser.role} (ক্লিক করে অন্য রোল সিলেক্ট করুন অথবা এডমিনে ফিরুন)`
+                      : 'Admin Role Simulator'
+                  }
+                  className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-medium shadow-sm transition-all cursor-pointer ${
+                    isSimulating
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/60 text-amber-200 ring-1 ring-amber-500/30'
+                      : 'bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-850 hover:to-slate-750 border-slate-700 text-slate-200'
+                  }`}
                 >
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="font-semibold text-amber-300">Simulate: {currentUser.role}</span>
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      isSimulating ? 'bg-amber-400 animate-ping' : 'bg-emerald-400 animate-ping'
+                    }`}
+                  />
+                  <span className={`font-semibold ${isSimulating ? 'text-amber-300 font-bold' : 'text-amber-300'}`}>
+                    {isSimulating ? `Simulating: ${currentUser.role}` : 'Role Simulator'}
+                  </span>
                   {currentUser.assignedBattery && (
                     <span className="text-slate-400 font-mono text-[11px] hidden sm:inline">
                       [{currentUser.assignedBattery}]
@@ -175,30 +197,57 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {roleDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-2 z-50 text-slate-200 divide-y divide-slate-800">
-                    <div className="px-3 py-1.5 text-[11px] text-slate-400 font-semibold font-mono">
-                      Switch Role
+                    <div className="px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 font-semibold font-mono">
+                      <span>ADMIN ROLE SIMULATOR</span>
+                      {isSimulating && (
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-sans font-semibold">
+                          Active Sim
+                        </span>
+                      )}
                     </div>
 
-                    <div className="py-1">
-                      {rolesList.map((r) => (
+                    {isSimulating && (
+                      <div className="p-2 bg-amber-950/40">
                         <button
-                          key={r.role}
                           onClick={() => {
-                            switchRole(r.role, r.bty);
+                            exitSimulation();
                             setRoleDropdownOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-800 transition-colors ${
-                            currentUser.role === r.role ? 'bg-rose-950/40 border-l-2 border-rose-500 text-white font-bold' : ''
-                          }`}
+                          className="w-full text-center px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                         >
-                          <span className="text-slate-100">{r.label}</span>
-                          {r.bty && (
-                            <span className="text-[10px] font-mono bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
-                              {r.bty}
-                            </span>
-                          )}
+                          <ShieldAlert className="w-3.5 h-3.5 text-slate-950" />
+                          <span>Exit Simulation (এডমিন মোডে ফিরুন)</span>
                         </button>
-                      ))}
+                      </div>
+                    )}
+
+                    <div className="py-1 max-h-64 overflow-y-auto">
+                      {rolesList.map((r) => {
+                        const isCurrent =
+                          currentUser.role === r.role && (!r.bty || currentUser.assignedBattery === r.bty);
+                        return (
+                          <button
+                            key={r.role + (r.bty || '')}
+                            onClick={() => {
+                              switchRole(r.role, r.bty);
+                              setRoleDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800 transition-colors cursor-pointer ${
+                              isCurrent ? 'bg-rose-950/40 border-l-2 border-rose-500 text-white font-bold' : ''
+                            }`}
+                          >
+                            <div className="flex flex-col">
+                              <span className="text-slate-100 font-medium">{r.label}</span>
+                              <span className="text-[10px] text-slate-400">{r.desc}</span>
+                            </div>
+                            {r.bty && (
+                              <span className="text-[10px] font-mono bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 ml-2">
+                                {r.bty}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
 
                     <div className="p-2">
@@ -207,7 +256,7 @@ export const Header: React.FC<HeaderProps> = ({
                           logout();
                           setRoleDropdownOpen(false);
                         }}
-                        className="w-full text-center px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center gap-1.5 font-medium"
+                        className="w-full text-center px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center gap-1.5 font-medium cursor-pointer"
                       >
                         <LogOut className="w-3.5 h-3.5 text-rose-400" />
                         <span>Logout Session</span>

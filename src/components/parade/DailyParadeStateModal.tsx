@@ -424,17 +424,6 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
               <span className="sm:hidden">Download</span>
             </button>
 
-            {/* Print State Button */}
-            <button
-              onClick={handlePrintState}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950/40 transition-all cursor-pointer"
-              title="Print Official Parade State Sheet"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Print State</span>
-              <span className="sm:hidden">Print</span>
-            </button>
-
             {/* Close Button */}
             <button
               onClick={onClose}

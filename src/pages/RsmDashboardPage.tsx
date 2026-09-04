@@ -17,8 +17,6 @@ import {
   UserCheck,
   Calendar,
   UserPlus,
-  Printer,
-  Download,
 } from 'lucide-react';
 
 interface RsmDashboardPageProps {
@@ -98,15 +96,6 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Download Full Regiment 1-Page Parade State */}
-            <button
-              onClick={onOpenPrintModal}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Download Parade State</span>
-            </button>
-
             {onOpenAddModal && (
               <button
                 onClick={onOpenAddModal}
@@ -122,13 +111,6 @@ export const RsmDashboardPage: React.FC<RsmDashboardPageProps> = ({
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Detail Guard Shift</span>
-            </button>
-            <button
-              onClick={onOpenPrintModal}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
-            >
-              <Printer className="w-3.5 h-3.5 text-rose-400" />
-              <span>Print State</span>
             </button>
           </div>
         </div>

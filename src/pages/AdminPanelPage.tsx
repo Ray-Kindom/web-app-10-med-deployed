@@ -50,6 +50,9 @@ export const AdminPanelPage: React.FC = () => {
     customLogo,
     setCustomLogo,
     syncNominalRollToCloud,
+    isRealAdmin,
+    isSimulating,
+    exitSimulation,
   } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -64,7 +67,7 @@ export const AdminPanelPage: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const isAdmin = currentUser.role === 'Admin';
+  const isAdmin = currentUser.role === 'Admin' || isRealAdmin;
 
   const handleOpenAddUser = () => {
     setEditingUser(null);
