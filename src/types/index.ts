@@ -6,7 +6,8 @@ export type Role =
   | 'Q BSM'
   | 'R BSM'
   | 'HQ BSM'
-  | 'Admin';
+  | 'Admin'
+  | 'Guest';
 
 export const OFFICER_RANKS: string[] = ['Lt Col', 'Maj', 'Capt', 'Lt', '2Lt'];
 

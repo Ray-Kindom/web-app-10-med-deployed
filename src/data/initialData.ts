@@ -6998,6 +6998,20 @@ export const INITIAL_USERS: UserAccount[] = [
   }
 ];
 
+export const GUEST_USER: UserAccount = {
+  id: 'guest-account',
+  username: 'Guest',
+  password: 'guest123',
+  name: 'Guest Viewer',
+  snkNo: 'GUEST-10M',
+  rank: 'Visitor',
+  role: 'Guest',
+  accessLevel: 'GUEST — VIEW ONLY',
+  assignedBatteries: ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'],
+  assignedBattery: 'HQ Bty',
+  lastLogin: 'Active Demo Session',
+};
+
 export const INITIAL_DUTY_ROSTER: DutyAssignment[] = [
   {
     id: 'd-1',
