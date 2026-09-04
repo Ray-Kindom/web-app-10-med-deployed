@@ -50,7 +50,7 @@ const ROLES_CONFIG: { role: Role; label: string; defaultAccess: string; defaultB
   {
     role: 'CO',
     label: 'Commanding Officer (CO)',
-    defaultAccess: 'Executive Read-Only Strategic View',
+    defaultAccess: 'Executive Command & Strategic Overview',
     defaultBatteries: ['HQ Bty', 'P Bty', 'Q Bty', 'R Bty'],
   },
   {

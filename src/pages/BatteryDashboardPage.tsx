@@ -10,7 +10,6 @@ import {
   ShieldAlert,
   HeartPulse,
   PlaneTakeoff,
-  Send,
   Radio,
   X,
 } from 'lucide-react';
@@ -93,16 +92,8 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
   const courseCount = btyPersonnel.filter((p) => p.status === 'Course/Trg' || p.status === 'Temp Duty').length;
 
   const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
-  const isBsmRestricted = isBsm && currentUser.assignedBattery && currentUser.assignedBattery !== activeBattery;
-
-  const handleSubmitMorningRoll = () => {
-    showNotification(`Morning Parade State for ${activeBattery} submitted to RSM & Duty Officer.`);
-    addAuditLog(
-      'Battery State Submitted',
-      `Submitted ${activeBattery} state with ${presentCount} present out of ${postedCount}`,
-      'PARADE_STATE'
-    );
-  };
+  const isRsm = currentUser.role === 'RSM' || currentUser.role === 'Admin';
+  const canManageOutOfUnit = isBsm || isRsm;
 
   // Personnel for popup modal
   const modalPersonnel = selectedStatFilter
@@ -147,17 +138,6 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
             </div>
           )}
         </div>
-
-        {/* Right action controls: BSM Morning Roll submission if eligible */}
-        {isBsm && !isBsmRestricted && (
-          <button
-            onClick={handleSubmitMorningRoll}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-950/40 transition-colors whitespace-nowrap cursor-pointer self-start sm:self-auto"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Submit {activeBattery} Morning Roll</span>
-          </button>
-        )}
       </div>
 
       {/* Battery Stat Cards - adjusted with beautiful layout, clean spacing, and high contrast */}
@@ -206,8 +186,8 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
         />
       </div>
 
-      {/* Updt Daily Parade State & Updt Out Of Unit Action Control Boxes */}
-      <ParadeActionControls battery={activeBattery} />
+      {/* Updt Out Of Unit Action Control Box (Only accessible to RSM and BSM) */}
+      {canManageOutOfUnit && <ParadeActionControls battery={activeBattery} />}
 
 
 
