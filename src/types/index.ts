@@ -382,6 +382,23 @@ export interface RankConfig {
   seniority: number;
   isActive: boolean;
   banglaName?: string;
+  applicableForEnlistment?: boolean; // Whether available when enlisting soldiers
+  description?: string;
+}
+
+export type TradeCategory = 'COMBAT' | 'TECHNICAL' | 'SERVICES' | 'SUPPORT' | 'CIVILIAN' | 'OTHER';
+
+export interface TradeConfig {
+  id: string;
+  name: string; // e.g. 'Gnr', 'TA', 'OCU', 'DMT', 'E&BR', 'Tailor', etc.
+  code: string;
+  order: number;
+  isActive: boolean;
+  category?: TradeCategory | string;
+  applicableRankCategories?: RankCategory[]; // e.g. ['OR', 'Civilian', 'RCO']
+  applicableForEnlistment?: boolean; // Whether available when enlisting soldiers
+  description?: string;
+  banglaName?: string;
 }
 
 export interface AuthEstablishmentItem {

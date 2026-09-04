@@ -27,6 +27,10 @@ import {
   Printer,
   Download,
   Clock,
+  ArrowLeft,
+  Maximize2,
+  Minimize2,
+  Search,
 } from 'lucide-react';
 
 interface DailyParadeStateModalProps {
@@ -213,8 +217,28 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     setCountsBuffer(buffer);
   }, [isOpen, dynamicParadePoints, activeDate, sessionType]);
 
-  // Points visible for the active tab
-  const visiblePoints = useMemo(() => {
+  // Full-screen state (defaults to true as requested)
+  const [isFullScreen, setIsFullScreen] = useState(true);
+
+  // Quick PT Search & Category filter
+  const [pointSearchQuery, setPointSearchQuery] = useState('');
+  const [ptCategoryFilter, setPtCategoryFilter] = useState<'All' | 'PT' | 'Duty' | 'Sick' | 'Out'>('All');
+
+  // ESC key to close listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Points enabled for the active tab (all batteries or specific battery)
+  const tabPoints = useMemo(() => {
     return dynamicParadePoints.filter((pt) => {
       if (!pt.isActive) return false;
       if (activeTab === 'Consolidated') return true;
@@ -225,6 +249,69 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
       );
     });
   }, [dynamicParadePoints, activeTab]);
+
+  // Filtered points visible in table (with search query and category filter)
+  const visiblePoints = useMemo(() => {
+    return tabPoints.filter((pt) => {
+      // 1. Search Query
+      if (pointSearchQuery.trim()) {
+        const q = pointSearchQuery.toLowerCase();
+        const matchesName = pt.name.toLowerCase().includes(q);
+        const matchesCat = pt.category?.toLowerCase().includes(q);
+        if (!matchesName && !matchesCat) return false;
+      }
+
+      // 2. Category Filter
+      if (ptCategoryFilter === 'PT') {
+        const lower = pt.name.toLowerCase();
+        return (
+          lower.includes('pt') ||
+          lower.includes('parade') ||
+          lower.includes('athletics') ||
+          lower.includes('cadre') ||
+          lower.includes('trg') ||
+          lower.includes('course')
+        );
+      }
+      if (ptCategoryFilter === 'Duty') {
+        const lower = pt.name.toLowerCase();
+        return (
+          lower.includes('duty') ||
+          lower.includes('guard') ||
+          lower.includes('rp') ||
+          lower.includes('canteen') ||
+          lower.includes('cook') ||
+          lower.includes('mess') ||
+          lower.includes('mt') ||
+          lower.includes('wksp') ||
+          lower.includes('fresh') ||
+          lower.includes('eqp')
+        );
+      }
+      if (ptCategoryFilter === 'Sick') {
+        const lower = pt.name.toLowerCase();
+        return (
+          lower.includes('sick') ||
+          lower.includes('cmh') ||
+          lower.includes('hosp') ||
+          lower.includes('med')
+        );
+      }
+      if (ptCategoryFilter === 'Out') {
+        const lower = pt.name.toLowerCase();
+        return (
+          lower.includes('comd') ||
+          lower.includes('leave') ||
+          lower.includes('lve') ||
+          lower.includes('att') ||
+          lower.includes('off parade') ||
+          lower.includes('chutti')
+        );
+      }
+
+      return true;
+    });
+  }, [tabPoints, pointSearchQuery, ptCategoryFilter]);
 
   // Autocomplete suggestions for new point
   const pointSuggestions = useMemo(() => {
@@ -304,7 +391,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
     let grandJco = 0;
     let grandOr = 0;
 
-    visiblePoints.forEach((pt) => {
+    tabPoints.forEach((pt) => {
       if (activeTab === 'Consolidated') {
         ALL_BATTERIES.forEach((bty) => {
           const c = pt.counts[bty] || { offr: 0, jco: 0, or: 0 };
@@ -326,7 +413,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
       grandOr,
       grandTotal: grandOffr + grandJco + grandOr,
     };
-  }, [visiblePoints, activeTab]);
+  }, [tabPoints, activeTab]);
 
   const handleDownloadState = () => {
     try {
@@ -422,23 +509,54 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-6xl bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+    <div
+      className={
+        isFullScreen
+          ? 'fixed inset-0 z-50 w-full h-full bg-slate-950 flex flex-col overflow-hidden animate-fadeIn'
+          : 'fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn'
+      }
+    >
+      <div
+        className={
+          isFullScreen
+            ? 'relative w-full h-full bg-slate-950 flex flex-col overflow-hidden'
+            : 'relative w-full max-w-7xl bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]'
+        }
+      >
         {/* Header */}
-        <div className="px-5 py-3.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="px-4 sm:px-6 py-3 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 shrink-0">
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition-all cursor-pointer shadow-sm group"
+              title="Close & return to Dashboard (ড্যাশবোর্ডে ফিরুন)"
+            >
+              <ArrowLeft className="w-4 h-4 text-rose-400 group-hover:-translate-x-0.5 transition-transform" />
+              <span className="hidden sm:inline">Back / ফেরত যান</span>
+              <span className="sm:hidden">Back</span>
+            </button>
+
+            <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 shrink-0">
               <Layers className="w-5 h-5" />
             </div>
+
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg font-bold text-white tracking-wide">
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-wide">
                   {sessionType} Parade State
                 </h3>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {isBsm ? `${activeTab} View` : 'Regimental Overview'}
+                  {isBsm ? `${activeTab} View` : 'Regimental Full Overview'}
                 </span>
+                {isFullScreen && (
+                  <span className="hidden sm:inline px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    FULL SCREEN
+                  </span>
+                )}
               </div>
+              <p className="text-[11px] text-slate-400 font-mono hidden sm:block">
+                10 Medium Regiment Artillery — Comprehensive Parade &amp; PT Inspection Sheet
+              </p>
             </div>
           </div>
 
@@ -468,7 +586,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
             >
               <Download className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden sm:inline">Download State</span>
-              <span className="sm:hidden">Download</span>
+              <span className="sm:hidden">Excel</span>
             </button>
 
             {/* Print State Button */}
@@ -488,11 +606,20 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
               <span className="sm:hidden">Print</span>
             </button>
 
+            {/* Fullscreen Toggle Button */}
+            <button
+              onClick={() => setIsFullScreen(!isFullScreen)}
+              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer border border-slate-700"
+              title={isFullScreen ? 'Exit Full Screen (Window Mode)' : 'Enter Full Screen'}
+            >
+              {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+
             {/* Close Button */}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer ml-1"
-              title="Close"
+              className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-white transition-colors cursor-pointer ml-1 border border-slate-700"
+              title="Close (Esc)"
             >
               <X className="w-5 h-5" />
             </button>
@@ -560,12 +687,12 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
           );
         })()}
 
-        {/* Tab Selection & Control Bar */}
-        <div className="px-6 pt-3 pb-2 bg-slate-950/80 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        {/* Tab Selection & PT Filter Control Bar */}
+        <div className="px-4 sm:px-6 py-2.5 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
           {/* View Mode & Battery Tabs */}
           <div className="flex items-center gap-2 flex-wrap">
             {(isRsmOrAdmin || isReadOnly) && (
-              <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-700/80 mr-2 text-xs font-mono font-bold">
+              <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-700/80 text-xs font-mono font-bold">
                 <button
                   onClick={() => {
                     setRsmViewMode('Summary');
@@ -577,7 +704,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  Summary View (All Batteries)
+                  Summary View (Consolidated)
                 </button>
                 <button
                   onClick={() => {
@@ -606,7 +733,7 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                     <button
                       key={bty}
                       onClick={() => setActiveTab(bty)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                         activeTab === bty
                           ? 'bg-gradient-to-r from-slate-800 to-slate-700 text-white border border-slate-600 shadow-md'
                           : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-800'
@@ -620,19 +747,66 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          {/* Quick PT Search & Category Filters */}
+          <div className="flex items-center gap-2 flex-1 max-w-xl justify-end flex-wrap">
+            {/* Search Input */}
+            <div className="relative min-w-[200px] sm:min-w-[240px] flex-1">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={pointSearchQuery}
+                onChange={(e) => setPointSearchQuery(e.target.value)}
+                placeholder="Search PT / Point (e.g. GPT, On Parade, Sick)..."
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+              />
+              {pointSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setPointSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Category Filter Chips */}
+            <div className="flex items-center gap-1">
+              {[
+                { key: 'All', label: 'All PTs' },
+                { key: 'PT', label: '🏃 PT/Parade' },
+                { key: 'Duty', label: '🛡️ Duties' },
+                { key: 'Sick', label: '🏥 Sick' },
+                { key: 'Out', label: '✈️ Out' },
+              ].map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setPtCategoryFilter(chip.key as any)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                    ptCategoryFilter === chip.key
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            {/* RSM Controls Toggle */}
             {isRsmOrAdmin && !isReadOnly && (
               <button
                 onClick={() => setShowRsmControls(!showRsmControls)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer whitespace-nowrap ${
                   showRsmControls
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                     : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
                 }`}
+                title="Toggle Battery Visibility Controls"
               >
                 <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                <span>Battery Visibility Controls</span>
+                <span className="hidden sm:inline">Visibility</span>
               </button>
             )}
 
@@ -640,10 +814,10 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
             {isAdmin && !isReadOnly && (
               <button
                 onClick={() => setIsAddingNewPoint(!isAddingNewPoint)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Add Parade Point (Admin)</span>
+                <span>+ Point</span>
               </button>
             )}
           </div>
@@ -819,13 +993,13 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
         )}
 
         {/* Parade State Table */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-4">
-          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/90 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+              <thead className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md shadow-sm">
+                <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
                   <th className="py-3 px-3 w-12 text-center">Sl</th>
-                  <th className="py-3 px-4 min-w-[200px]">Duty Point (প্যারেড পয়েন্ট)</th>
+                  <th className="py-3 px-4 min-w-[220px]">Duty Point / PT (প্যারেড পয়েন্ট)</th>
                   {activeTab === 'Consolidated' ? (
                     <>
                       <th className="py-3 px-3 text-center bg-slate-950/40">HQ Bty</th>
@@ -851,6 +1025,13 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {visiblePoints.map((pt, idx) => {
+                  const upperName = pt.name.toUpperCase();
+                  const isMainParade =
+                    upperName.includes('ON PARADE') ||
+                    upperName === 'GPT' ||
+                    upperName === 'IPFT' ||
+                    upperName.includes('PHYSICAL TRAINING');
+
                   if (activeTab === 'Consolidated') {
                     const hq = pt.counts['HQ Bty'] || { offr: 0, jco: 0, or: 0 };
                     const p = pt.counts['P Bty'] || { offr: 0, jco: 0, or: 0 };
@@ -865,13 +1046,26 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                     return (
                       <tr
                         key={pt.id}
-                        className="hover:bg-slate-900/60 transition-colors"
+                        className={`transition-colors ${
+                          isMainParade
+                            ? 'bg-emerald-950/20 hover:bg-emerald-950/30'
+                            : 'hover:bg-slate-900/60'
+                        }`}
                       >
                         <td className="py-2.5 px-3 text-center text-slate-500 font-mono">
                           {idx + 1}
                         </td>
                         <td className="py-2.5 px-4 font-bold text-slate-200">
-                          {pt.name}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={isMainParade ? 'text-emerald-300 font-black' : ''}>
+                              {pt.name}
+                            </span>
+                            {isMainParade && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                                MAIN PT
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
                           {hq.offr + hq.jco + hq.or}
@@ -912,8 +1106,12 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                   return (
                     <tr
                       key={pt.id}
-                      className={`hover:bg-slate-900/60 transition-colors ${
-                        isLockedByRsm ? 'bg-amber-950/10' : ''
+                      className={`transition-colors ${
+                        isLockedByRsm
+                          ? 'bg-amber-950/10'
+                          : isMainParade
+                          ? 'bg-emerald-950/20 hover:bg-emerald-950/30'
+                          : 'hover:bg-slate-900/60'
                       }`}
                     >
                       <td className="py-2.5 px-3 text-center text-slate-500 font-mono">
@@ -921,7 +1119,14 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                       </td>
                       <td className="py-2.5 px-4 font-bold text-slate-200">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span>{pt.name}</span>
+                          <span className={isMainParade ? 'text-emerald-300 font-black' : ''}>
+                            {pt.name}
+                          </span>
+                          {isMainParade && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                              MAIN PT
+                            </span>
+                          )}
                           {isLockedByRsm && (
                             <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
                               <span>🔒 RSM Fixed</span>
@@ -1007,9 +1212,30 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                     </tr>
                   );
                 })}
+
+                {visiblePoints.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={activeTab === 'Consolidated' ? 10 : 6}
+                      className="py-12 text-center text-slate-400 font-mono"
+                    >
+                      <span>No parade points matched "{pointSearchQuery || ptCategoryFilter}".</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPointSearchQuery('');
+                          setPtCategoryFilter('All');
+                        }}
+                        className="ml-2 text-rose-400 underline font-bold cursor-pointer"
+                      >
+                        Reset Filter
+                      </button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-slate-700 bg-slate-950 font-bold text-white text-xs">
+              <tfoot className="sticky bottom-0 z-20 bg-slate-950 border-t-2 border-slate-700 shadow-2xl">
+                <tr className="bg-slate-950 font-bold text-white text-xs">
                   <td colSpan={2} className="py-3.5 px-4 text-rose-400 uppercase tracking-wider">
                     {activeTab === 'Consolidated'
                       ? 'Regimental Grand Total (সর্বমোট প্যারেড স্টেট)'

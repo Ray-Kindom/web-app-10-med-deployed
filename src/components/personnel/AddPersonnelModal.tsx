@@ -24,7 +24,15 @@ export const AddPersonnelModal: React.FC<AddPersonnelModalProps> = ({
   onClose,
   defaultBattery,
 }) => {
-  const { addPersonnel, currentUser } = useApp();
+  const {
+    addPersonnel,
+    currentUser,
+    ranksList,
+    tradesList,
+    subUnitsList,
+    enlistmentRanks,
+    getTradesForRank,
+  } = useApp();
 
   const isAuthorized =
     currentUser.role === 'RSM' ||
@@ -32,10 +40,33 @@ export const AddPersonnelModal: React.FC<AddPersonnelModalProps> = ({
     currentUser.role === 'CO' ||
     currentUser.role.includes('BSM');
 
+  // Dynamic rank options from Admin configuration
+  const availableRanks = React.useMemo(() => {
+    const list = enlistmentRanks && enlistmentRanks.length > 0
+      ? enlistmentRanks
+      : ranksList.filter((r) => r.isActive !== false);
+    return list.length > 0 ? list : [{ id: 'snk', name: 'Snk', code: 'Snk', category: 'OR' as const, order: 1, seniority: 1, isActive: true }];
+  }, [enlistmentRanks, ranksList]);
+
+  // Dynamic battery options from Admin configuration
+  const availableBatteries = React.useMemo(() => {
+    const activeUnits = subUnitsList.filter((u) => u.isActive !== false);
+    return activeUnits.length > 0 ? activeUnits.map((u) => u.name as Battery) : ALL_BATTERIES;
+  }, [subUnitsList]);
+
   const [snkNo, setSnkNo] = useState('');
   const [batch, setBatch] = useState('');
   const [name, setName] = useState('');
   const [rk, setRk] = useState<MilitaryRank | string>('Snk');
+
+  // Dynamic trades for current rank
+  const availableTrades = React.useMemo(() => {
+    if (getTradesForRank) {
+      return getTradesForRank(rk);
+    }
+    return tradesList.filter((t) => t.isActive !== false);
+  }, [getTradesForRank, rk, tradesList]);
+
   const [trade, setTrade] = useState<Trade | string>('Gnr');
   const [battery, setBattery] = useState<Battery>(
     defaultBattery || (currentUser.assignedBattery as Battery) || 'HQ Bty'
@@ -54,16 +85,18 @@ export const AddPersonnelModal: React.FC<AddPersonnelModalProps> = ({
   const [nokName, setNokName] = useState('');
   const [phone, setPhone] = useState('');
 
-  // Auto handle officer trade (Officers have NO trade)
+  // Auto handle officer trade (Officers have NO trade per Bangladesh Army regulations)
   const isOffr = isOfficerRank(rk);
 
   useEffect(() => {
     if (isOfficerRank(rk)) {
       setTrade('-');
-    } else if (trade === '-') {
-      setTrade('Gnr');
+    } else {
+      if (trade === '-' || !availableTrades.some((t) => t.name === trade)) {
+        setTrade(availableTrades[0]?.name || 'Gnr');
+      }
     }
-  }, [rk]);
+  }, [rk, availableTrades]);
 
   useEffect(() => {
     if (defaultBattery) {
@@ -214,9 +247,9 @@ export const AddPersonnelModal: React.FC<AddPersonnelModalProps> = ({
                   onChange={(e) => setRk(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-white font-medium focus:outline-none focus:border-rose-500"
                 >
-                  {ALL_RANKS.map((rankOption) => (
-                    <option key={rankOption} value={rankOption}>
-                      {rankOption}
+                  {availableRanks.map((rankOption) => (
+                    <option key={rankOption.id} value={rankOption.name}>
+                      {rankOption.name} {rankOption.banglaName ? `(${rankOption.banglaName})` : ''} - {rankOption.category}
                     </option>
                   ))}
                 </select>
@@ -246,9 +279,9 @@ export const AddPersonnelModal: React.FC<AddPersonnelModalProps> = ({
                     onChange={(e) => setTrade(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-white font-mono focus:outline-none focus:border-rose-500"
                   >
-                    {ALL_TRADES.map((tradeOption) => (
-                      <option key={tradeOption} value={tradeOption}>
-                        {tradeOption}
+                    {availableTrades.map((tradeOption) => (
+                      <option key={tradeOption.id} value={tradeOption.name}>
+                        {tradeOption.name} {tradeOption.banglaName ? `(${tradeOption.banglaName})` : ''}
                       </option>
                     ))}
                   </select>
@@ -264,7 +297,7 @@ export const AddPersonnelModal: React.FC<AddPersonnelModalProps> = ({
                   onChange={(e) => setBattery(e.target.value as Battery)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-white font-mono focus:outline-none focus:border-rose-500"
                 >
-                  {ALL_BATTERIES.map((b) => (
+                  {availableBatteries.map((b) => (
                     <option key={b} value={b}>
                       {b}
                     </option>

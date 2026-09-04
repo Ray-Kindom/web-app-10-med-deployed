@@ -18,6 +18,7 @@ import {
   SubCategoryItem,
   SubUnitConfig,
   RankConfig,
+  TradeConfig,
   AuthEstablishmentItem,
   CalculationConfig,
   RankCategory,
@@ -36,6 +37,7 @@ import {
   INITIAL_SYSTEM_CATEGORIES,
   INITIAL_SUB_UNITS,
   INITIAL_RANKS,
+  INITIAL_TRADES,
   INITIAL_AUTH_ESTABLISHMENT,
   INITIAL_CALCULATION_CONFIG,
 } from '../data/configData';
@@ -122,6 +124,19 @@ interface AppContextType {
   addRank: (rank: Omit<RankConfig, 'id'>) => boolean;
   updateRank: (id: string, updated: Partial<RankConfig>) => boolean;
   deleteRank: (id: string) => boolean;
+
+  // Trades & Specializations Configuration (ADMIN FULL CONTROL)
+  tradesList: TradeConfig[];
+  addTrade: (trade: Omit<TradeConfig, 'id'>) => boolean;
+  updateTrade: (id: string, updated: Partial<TradeConfig>) => boolean;
+  deleteTrade: (id: string) => boolean;
+
+  // Centralized Dynamic Lists & Helpers
+  activeRanks: RankConfig[];
+  enlistmentRanks: RankConfig[];
+  activeTrades: TradeConfig[];
+  enlistmentTrades: TradeConfig[];
+  getTradesForRank: (rankName: string) => TradeConfig[];
 
   // AUTH / Authorized Establishment (ADMIN STRICT CONTROL ONLY)
   authEstablishmentList: AuthEstablishmentItem[];
@@ -221,6 +236,7 @@ const STORAGE_KEYS = {
   SYSTEM_CATEGORIES: '10med_system_categories_v1',
   SUB_UNITS: '10med_sub_units_v1',
   MILITARY_RANKS: '10med_military_ranks_v1',
+  MILITARY_TRADES: '10med_military_trades_v1',
   AUTH_ESTABLISHMENT: '10med_auth_establishment_v1',
   CALCULATION_CONFIG: '10med_calc_config_v1',
 };
@@ -329,6 +345,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) {}
     }
     return INITIAL_RANKS;
+  });
+
+  // Trades & Specializations Configuration
+  const [tradesList, setTradesList] = useState<TradeConfig[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.MILITARY_TRADES);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return INITIAL_TRADES;
   });
 
   // Authorized Establishment (AUTH) - Strictly Admin
@@ -587,17 +614,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .filter((p: ParadeTypeDefinition) => p.id !== 'Roll Call' && p.name !== 'Roll Call')
             .map((p: ParadeTypeDefinition) => {
               const lower = (p.name || p.id || '').toLowerCase();
-              let creator = p.createdBy;
-              if (!creator) {
-                creator = (lower === 'morning' || lower === 'second period' || lower === 'games') ? 'Admin' : 'RSM';
-              } else if (creator.toUpperCase().includes('ADMIN')) {
-                creator = 'Admin';
-              } else if (creator.toUpperCase().includes('RSM')) {
-                creator = 'RSM';
-              }
+              const isCore = lower === 'morning' || lower === 'second period' || lower === 'games';
               return {
                 ...p,
-                createdBy: creator,
+                createdBy: isCore ? 'Admin' : 'RSM',
                 isDeleted: p.isDeleted || p.deleted || false,
               };
             });
@@ -833,8 +853,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const trimmed = name.trim();
     if (!trimmed) return;
 
-    // Ownership: strictly 'Admin' or 'RSM'
-    const creatorRole: 'Admin' | 'RSM' = isAdmin ? 'Admin' : 'RSM';
+    // Any newly created parade type is strictly created by/for RSM
+    const creatorRole: 'RSM' = 'RSM';
 
     const newType: ParadeTypeDefinition = {
       id: trimmed,
@@ -844,7 +864,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headings: headings || ['OFFR', 'JCO', 'OR'],
       createdAt: new Date().toISOString(),
       createdBy: creatorRole,
-      createdByName: `${currentUser.rank} ${currentUser.name} (${currentUser.role})`,
+      createdByName: `${currentUser.rank} ${currentUser.name} (RSM)`,
       isDeleted: false,
       deleted: false,
       status: 'active',
@@ -863,10 +883,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'save parade type'
     );
 
-    showNotification(`New Parade State Type "${trimmed}" created by ${creatorRole}.`);
+    showNotification(`New Parade State Type "${trimmed}" created by RSM.`);
     addAuditLog(
       'Parade Type Created',
-      `New Parade State type "${trimmed}" created by ${currentUser.name} (${creatorRole})`,
+      `New Parade State type "${trimmed}" created by ${currentUser.name} (RSM)`,
       'PARADE_STATE'
     );
   };
@@ -907,24 +927,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetType = paradeTypes.find((t) => t.id === id || t.name === id);
     if (!targetType) return false;
 
-    const isActualRsm = currentUser.role === 'RSM';
-    const isCreatorAdmin = !targetType.createdBy || targetType.createdBy.toUpperCase().includes('ADMIN');
-    const isCreatorRsm = targetType.createdBy?.toUpperCase().includes('RSM');
-
-    // Admin can delete ANY parade state (Admin-created or RSM-created)
-    // RSM can delete ONLY RSM-created parade state (RSM cannot delete Admin-created)
-    // Officers and CO cannot delete
-    const hasPermission = isAdmin || (isActualRsm && isCreatorRsm && !isCreatorAdmin);
+    const isDefaultType = ['Morning', 'Second Period', 'Games'].includes(targetType.name) || ['Morning', 'Second Period', 'Games'].includes(targetType.id);
+    const hasPermission = (currentUser.role === 'RSM' || isAdmin) && !isDefaultType;
 
     if (!hasPermission) {
-      if (isActualRsm && isCreatorAdmin) {
-        showNotification('Permission Denied: RSM cannot delete an Admin-created Parade State.');
+      if (isDefaultType) {
+        showNotification('মূল প্যারেড স্টেট (Morning, Second Period, Games) ডিলিট করা যাবে না।');
       } else {
-        showNotification('Permission Denied: You do not have permission to delete this Parade State.');
+        showNotification('Permission Denied: শুধুমাত্র RSM নতুন তৈরি করা প্যারেড স্টেট ডিলিট করতে পারবেন।');
       }
       addAuditLog(
         'Unauthorized Delete Attempt',
-        `${currentUser.name} (${currentUser.role}) attempted to delete parade type "${targetType.name}" (Created by: ${targetType.createdBy || 'Admin'})`,
+        `${currentUser.name} (${currentUser.role}) attempted to delete parade type "${targetType.name}" (Created by: ${targetType.createdBy || 'RSM'})`,
         'SECURITY'
       );
       return false;
@@ -932,7 +946,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Soft-Delete / Archive: Preserve the record in database with deleted = true
     const nowIso = new Date().toISOString();
-    const deletedByRole: 'Admin' | 'RSM' = isAdmin ? 'Admin' : 'RSM';
+    const deletedByRole: 'Admin' | 'RSM' = 'RSM';
     const updatedType: ParadeTypeDefinition = {
       ...targetType,
       isDeleted: true,
@@ -1256,6 +1270,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  // 3b. Military Trades & Specializations (ADMIN FULL CONTROL)
+  const addTrade = (trade: Omit<TradeConfig, 'id'>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to add trades.');
+      return false;
+    }
+    const newId = 'trd-' + Date.now();
+    const newTrade: TradeConfig = {
+      ...trade,
+      id: newId,
+      isActive: trade.isActive ?? true,
+      applicableForEnlistment: trade.applicableForEnlistment ?? true,
+    };
+    const next = [...tradesList, newTrade];
+    setTradesList(next);
+    localStorage.setItem(STORAGE_KEYS.MILITARY_TRADES, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'military_trades', newId), sanitizeForFirestore(newTrade)), 'add trade');
+    showNotification(`Trade "${newTrade.name}" added by ADMIN.`);
+    addAuditLog('Trade Added', `ADMIN created trade ${newTrade.name} (${newTrade.code})`, 'SYSTEM');
+    return true;
+  };
+
+  const updateTrade = (id: string, updated: Partial<TradeConfig>): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to edit trades.');
+      return false;
+    }
+    const next = tradesList.map((t) => (t.id === id ? { ...t, ...updated } : t));
+    setTradesList(next);
+    localStorage.setItem(STORAGE_KEYS.MILITARY_TRADES, JSON.stringify(next));
+    syncDoc(setDoc(doc(db, 'military_trades', id), sanitizeForFirestore(updated), { merge: true }), 'update trade');
+    showNotification(`Trade updated by ADMIN.`);
+    addAuditLog('Trade Updated', `ADMIN updated trade ${id}`, 'SYSTEM');
+    return true;
+  };
+
+  const deleteTrade = (id: string): boolean => {
+    if (!isAdmin) {
+      showNotification('Access Denied: Only ADMIN has permission to delete trades.');
+      return false;
+    }
+    const next = tradesList.filter((t) => t.id !== id);
+    setTradesList(next);
+    localStorage.setItem(STORAGE_KEYS.MILITARY_TRADES, JSON.stringify(next));
+    syncDoc(deleteDoc(doc(db, 'military_trades', id)), 'delete trade');
+    showNotification(`Trade deleted by ADMIN.`);
+    addAuditLog('Trade Deleted', `ADMIN deleted trade ${id}`, 'SYSTEM');
+    return true;
+  };
+
+  // Helper dynamic lists for Ranks & Trades (Auto-updated throughout entire app)
+  const activeRanks = React.useMemo(() => {
+    return [...ranksList]
+      .filter((r) => r.isActive !== false)
+      .sort((a, b) => a.order - b.order);
+  }, [ranksList]);
+
+  const enlistmentRanks = React.useMemo(() => {
+    return [...ranksList]
+      .filter((r) => r.isActive !== false && r.applicableForEnlistment !== false)
+      .sort((a, b) => a.order - b.order);
+  }, [ranksList]);
+
+  const activeTrades = React.useMemo(() => {
+    return [...tradesList]
+      .filter((t) => t.isActive !== false)
+      .sort((a, b) => a.order - b.order);
+  }, [tradesList]);
+
+  const enlistmentTrades = React.useMemo(() => {
+    return [...tradesList]
+      .filter((t) => t.isActive !== false && t.applicableForEnlistment !== false)
+      .sort((a, b) => a.order - b.order);
+  }, [tradesList]);
+
+  const getTradesForRank = React.useCallback((rankName: string): TradeConfig[] => {
+    if (!rankName || isOfficerRank(rankName)) {
+      return [{
+        id: 'trd-none',
+        name: '-',
+        code: '-',
+        order: 0,
+        isActive: true,
+        category: 'CIVILIAN',
+        description: 'Commissioned Officer (No Trade)',
+      }];
+    }
+
+    const rankItem = ranksList.find(
+      (r) => r.name.toLowerCase() === rankName.toLowerCase() || r.code.toLowerCase() === rankName.toLowerCase()
+    );
+    const cat = rankItem?.category || 'OR';
+
+    const filtered = tradesList.filter((t) => {
+      if (t.isActive === false) return false;
+      if (!t.applicableRankCategories || t.applicableRankCategories.length === 0) return true;
+      return t.applicableRankCategories.includes(cat);
+    });
+
+    return filtered.length > 0
+      ? filtered.sort((a, b) => a.order - b.order)
+      : tradesList.filter((t) => t.isActive !== false).sort((a, b) => a.order - b.order);
+  }, [ranksList, tradesList]);
+
   // 4. Authorized Establishment (AUTH) - STRICT ADMIN CONTROL ONLY
   const updateAuthEstablishment = (id: string, updated: Partial<AuthEstablishmentItem>): boolean => {
     if (!isAdmin) {
@@ -1570,17 +1688,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .map((d) => {
               const data = d.data() as ParadeTypeDefinition;
               const lower = (data.name || data.id || '').toLowerCase();
-              let creator = data.createdBy;
-              if (!creator) {
-                creator = (lower === 'morning' || lower === 'second period' || lower === 'games') ? 'Admin' : 'RSM';
-              } else if (creator.toUpperCase().includes('ADMIN')) {
-                creator = 'Admin';
-              } else if (creator.toUpperCase().includes('RSM')) {
-                creator = 'RSM';
-              }
+              const isCore = lower === 'morning' || lower === 'second period' || lower === 'games';
               return {
                 ...data,
-                createdBy: creator,
+                createdBy: isCore ? 'Admin' : 'RSM',
                 isDeleted: data.isDeleted || data.deleted || false,
               };
             })
@@ -1700,6 +1811,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     );
 
+    // 11b. /military_trades listener
+    const unsubTrades = onSnapshot(
+      collection(db, 'military_trades'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteTrades = snapshot.docs
+            .map((d) => d.data() as TradeConfig)
+            .sort((a, b) => a.order - b.order);
+          setTradesList(remoteTrades);
+          localStorage.setItem(STORAGE_KEYS.MILITARY_TRADES, JSON.stringify(remoteTrades));
+        } else if (isAuthorizedAdmin) {
+          INITIAL_TRADES.forEach((t) => {
+            syncDoc(setDoc(doc(db, 'military_trades', t.id), sanitizeForFirestore(t)), 'seed military trades');
+          });
+        }
+      },
+      (err) => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'military_trades');
+        } catch {
+          // Handled and logged with full FirestoreErrorInfo
+        }
+      }
+    );
+
     // 12. /auth_establishment listener
     const unsubAuth = onSnapshot(
       collection(db, 'auth_establishment'),
@@ -1762,6 +1898,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubCategories();
       unsubSubUnits();
       unsubRanks();
+      unsubTrades();
       unsubAuth();
       unsubCalc();
     };
@@ -2599,6 +2736,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addRank,
         updateRank,
         deleteRank,
+
+        // Trades & Specializations (ADMIN CONTROL)
+        tradesList,
+        addTrade,
+        updateTrade,
+        deleteTrade,
+
+        // Centralized Dynamic Lists & Helpers
+        activeRanks,
+        enlistmentRanks,
+        activeTrades,
+        enlistmentTrades,
+        getTradesForRank,
 
         // Authorized Establishment (ADMIN CONTROL)
         authEstablishmentList,

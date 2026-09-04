@@ -89,9 +89,27 @@
         "category": { "type": "string" },
         "order": { "type": "number" },
         "seniority": { "type": "number" },
-        "isActive": { "type": "boolean" }
+        "isActive": { "type": "boolean" },
+        "applicableForEnlistment": { "type": "boolean" },
+        "banglaName": { "type": "string" }
       },
       "required": ["id", "name", "category", "order", "isActive"]
+    },
+    "TradeConfig": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "category": { "type": "string" },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "applicableRankCategories": { "type": "array", "items": { "type": "string" } },
+        "applicableForEnlistment": { "type": "boolean" },
+        "banglaName": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "name", "code", "order", "isActive"]
     },
     "AuthEstablishmentItem": {
       "type": "object",
@@ -186,6 +204,10 @@
     "/military_ranks/{rankId}": {
       "schema": "RankConfig",
       "description": "Military rank structure, seniority, and personnel rank categories managed by Admin"
+    },
+    "/military_trades/{tradeId}": {
+      "schema": "TradeConfig",
+      "description": "Military trades, gunner specializations, and trades classifications managed dynamically by Admin"
     },
     "/auth_establishment/{estId}": {
       "schema": "AuthEstablishmentItem",

@@ -35,7 +35,7 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
   allowStatusEdits = true,
   title,
 }) => {
-  const { updateParadeStatus, currentUser, showNotification, searchQuery, setSearchQuery, isGuest } = useApp();
+  const { updateParadeStatus, currentUser, showNotification, searchQuery, setSearchQuery, isGuest, ranksList, tradesList } = useApp();
 
   // Filter States - synced with header search query
   const [localSearchTerm, setLocalSearchTerm] = useState('');
@@ -60,31 +60,50 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
     'AWOL/OSL',
   ];
 
-  // Rank Filter Options
-  const rankFilterOptions = [
-    { value: 'All', label: 'All Ranks' },
-    { value: 'Offr', label: 'Offr (Officers)' },
-    { value: 'JCO', label: 'JCO (Junior Commissioned)' },
-    { value: 'OR', label: 'OR (Other Ranks)' },
-    { value: 'Civilian', label: 'Civilian' },
-    { value: 'RCO', label: 'RCO' },
-    { value: 'Sgt', label: 'Sgt' },
-    { value: 'Cpl', label: 'Cpl' },
-    { value: 'Lcpl', label: 'Lcpl' },
-    { value: 'Snk', label: 'Snk / Gnr' },
-  ];
+  // Dynamic Rank Filter Options
+  const rankFilterOptions = useMemo(() => {
+    const categoryOptions = [
+      { value: 'All', label: 'All Ranks (সব পদবী)' },
+      { value: 'Offr', label: 'Offr (All Officers)' },
+      { value: 'JCO', label: 'JCO (All Junior Commissioned)' },
+      { value: 'OR', label: 'OR (All Other Ranks / Soldiers)' },
+      { value: 'Civilian', label: 'Civilian (All Civilians)' },
+      { value: 'RCO', label: 'RCO (Religious Teacher)' },
+    ];
 
-  // Trade Filter Options (Short forms only)
-  const tradeFilterOptions = [
-    { value: 'All', label: 'All Trades' },
-    { value: 'TA', label: 'TA' },
-    { value: 'OCU', label: 'OCU' },
-    { value: 'DMT', label: 'DMT' },
-    { value: 'Gnr', label: 'Gnr' },
-    { value: 'Ck(U)', label: 'Ck(U)' },
-    { value: 'Tech', label: 'Tech' },
-    { value: 'GD', label: 'GD' },
-  ];
+    // Individual active ranks from ranksList
+    const specificRanks = ranksList
+      .filter((r) => r.isActive !== false)
+      .map((r) => ({ value: r.name, label: r.banglaName ? `${r.name} (${r.banglaName})` : r.name }));
+
+    // Deduplicate so options with the same value are not repeated
+    const seenValues = new Set<string>();
+    const combined: { value: string; label: string }[] = [];
+
+    for (const opt of [...categoryOptions, ...specificRanks]) {
+      if (!seenValues.has(opt.value)) {
+        seenValues.add(opt.value);
+        combined.push(opt);
+      }
+    }
+
+    return combined;
+  }, [ranksList]);
+
+  // Dynamic Trade Filter Options (populated from Admin tradesList & active personnel)
+  const tradeFilterOptions = useMemo(() => {
+    const uniqueTrades = Array.from(
+      new Set([
+        ...tradesList.filter((t) => t.isActive !== false).map((t) => t.name),
+        ...personnel.map((p) => p.trade).filter(Boolean) as string[],
+      ])
+    ).filter((t) => t !== '-');
+
+    return [
+      { value: 'All', label: 'All Trades' },
+      ...uniqueTrades.map((t) => ({ value: t, label: t })),
+    ];
+  }, [tradesList, personnel]);
 
   // Blood Group Options
   const bloodFilterOptions = [
@@ -129,21 +148,22 @@ export const PersonnelTable: React.FC<PersonnelTableProps> = ({
       // 2. Rank Filter
       if (selectedRank !== 'All') {
         if (selectedRank === 'Offr') {
-          const officerRanks = ['Lt Col', 'Maj', 'Capt', 'Lt', '2Lt'];
-          if (!officerRanks.includes(person.rk)) return false;
+          const officerRanks = ranksList.filter((r) => r.category === 'Officer').map((r) => r.name);
+          const list = officerRanks.length > 0 ? officerRanks : ['Lt Col', 'Maj', 'Capt', 'Lt', '2Lt'];
+          if (!list.includes(person.rk)) return false;
         } else if (selectedRank === 'JCO') {
-          const jcoRanks = ['SWO', 'WO', 'MWO'];
-          if (!jcoRanks.includes(person.rk)) return false;
+          const jcoRanks = ranksList.filter((r) => r.category === 'JCO').map((r) => r.name);
+          const list = jcoRanks.length > 0 ? jcoRanks : ['SWO', 'WO', 'MWO'];
+          if (!list.includes(person.rk)) return false;
         } else if (selectedRank === 'OR') {
-          const orRanks = ['Sgt', 'Cpl', 'Lcpl', 'Snk', 'Gnr', 'SNK DMT)'];
-          if (!orRanks.includes(person.rk)) return false;
+          const orRanks = ranksList.filter((r) => r.category === 'OR').map((r) => r.name);
+          const list = orRanks.length > 0 ? orRanks : ['Sgt', 'Cpl', 'Lcpl', 'Snk', 'Gnr', 'SNK DMT)'];
+          if (!list.includes(person.rk)) return false;
         } else if (selectedRank === 'Civilian') {
-          if (person.rk !== 'Civilian' && person.rk !== 'NC(E)' && person.rk !== 'NC(U)' && person.trade !== 'Civilian' && person.trade !== 'NC(E)') return false;
+          const civRanks = ranksList.filter((r) => r.category === 'Civilian').map((r) => r.name);
+          if (!civRanks.includes(person.rk) && person.rk !== 'Civilian' && person.rk !== 'NC(E)' && person.rk !== 'NC(U)' && person.trade !== 'Civilian' && person.trade !== 'NC(E)') return false;
         } else if (selectedRank === 'RCO') {
           if (person.rk !== 'RCO' && person.trade !== 'RCO') return false;
-        } else if (selectedRank === 'Snk') {
-          // Snk includes Gnr / Snk
-          if (person.rk !== 'Snk' && person.rk !== 'Gnr') return false;
         } else {
           if (person.rk !== selectedRank) return false;
         }

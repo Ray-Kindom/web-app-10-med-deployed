@@ -1,4 +1,5 @@
 import React from 'react';
+import { useApp } from '../../context/AppContext';
 
 interface RankBadgeProps {
   rank: string;
@@ -11,7 +12,30 @@ export const RankBadge: React.FC<RankBadgeProps> = ({
   trade,
   size = 'md',
 }) => {
+  const { ranksList } = useApp();
+
   const getRankStyle = (rk: string) => {
+    // Check dynamic ranksList first
+    const dynamicRank = ranksList?.find(
+      (r) => r.name.toLowerCase() === rk.toLowerCase() || (r.code && r.code.toLowerCase() === rk.toLowerCase())
+    );
+
+    if (dynamicRank) {
+      switch (dynamicRank.category) {
+        case 'Officer':
+          return { bg: 'bg-amber-500/20 text-amber-300 border-amber-500/40', category: 'Officer' };
+        case 'JCO':
+          return { bg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', category: 'JCO' };
+        case 'Civilian':
+          return { bg: 'bg-purple-500/20 text-purple-300 border-purple-500/40', category: 'Civilian' };
+        case 'RCO':
+          return { bg: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40', category: 'RCO' };
+        case 'OR':
+        default:
+          return { bg: 'bg-blue-500/20 text-blue-300 border-blue-500/40', category: 'OR' };
+      }
+    }
+
     switch (rk) {
       case 'Lt Col':
       case 'Maj':

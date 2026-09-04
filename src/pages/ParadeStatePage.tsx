@@ -16,6 +16,7 @@ import {
   Calendar,
   Clock,
   X,
+  Maximize2,
 } from 'lucide-react';
 
 interface ParadeStatePageProps {
@@ -181,18 +182,6 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
     <div className="space-y-6">
       {/* PRIMARY PARADE STATE TYPE BOXES/CARDS (Morning, Second Period, Games + Dynamic) */}
       <div className="space-y-2">
-        {isRsm && (
-          <div className="flex justify-end px-1">
-            <button
-              onClick={() => setIsAddTypeModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Parade Type</span>
-            </button>
-          </div>
-        )}
-
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {activeParadeTypes.map((type) => {
             const btyRecord = getParadeRecord(selectedParadeDate, type.name, assignedBty);
@@ -200,11 +189,12 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
             const stats = getParadeTypeStats(type.name);
 
             // Permission rules for deleting parade states:
-            // Admin-created: Only Admin can delete (RSM, Officers, CO cannot delete)
-            // RSM-created: RSM can delete, Admin can delete (Officers, CO cannot delete)
-            const isCreatorAdmin = !type.createdBy || type.createdBy.toUpperCase().includes('ADMIN');
-            const isCreatorRsm = type.createdBy?.toUpperCase().includes('RSM');
-            const canDelete = !isOfficerOrCo && (isAdmin || (isActualRsm && isCreatorRsm && !isCreatorAdmin));
+            // Default core types ('Morning', 'Second Period', 'Games') can NEVER be deleted.
+            // All custom types (including box 4, box 5, and any future ones) are RSM-created and can be deleted by RSM (or Admin).
+            const isDefaultType =
+              ['Morning', 'Second Period', 'Games'].includes(type.name) ||
+              ['Morning', 'Second Period', 'Games'].includes(type.id);
+            const canDelete = (isActualRsm || isAdmin) && !isDefaultType;
 
             return (
               <div
@@ -218,8 +208,15 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
                       {getParadeTypeIcon(type.name)}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-800/90 text-slate-400 border border-slate-700/80" title={`Created by: ${type.createdBy || 'Admin'}`}>
-                        {type.createdBy === 'RSM' ? 'RSM' : 'Admin'}
+                      <span
+                        className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border ${
+                          !isDefaultType
+                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                            : 'bg-slate-800/90 text-slate-400 border-slate-700/80'
+                        }`}
+                        title={`Created by: ${!isDefaultType ? 'RSM' : 'Admin'}`}
+                      >
+                        {!isDefaultType ? 'RSM' : 'Admin'}
                       </span>
                       <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${badge.bg}`}>
                         {badge.text}
@@ -233,8 +230,8 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
                               deleteParadeType(type.id);
                             }
                           }}
-                          title={`Delete ${type.name} box`}
-                          className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-800/80 transition-colors cursor-pointer"
+                          title={`Delete ${type.name} Parade State`}
+                          className="p-1 rounded-md text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 transition-colors cursor-pointer border border-rose-500/30 bg-rose-500/10"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -274,16 +271,17 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
                     <Clock className="w-3 h-3 text-slate-500" />
                     <span>Last Edit: <strong className="text-slate-300">{stats.lastEditTime}</strong></span>
                   </span>
-                  <span className="text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform text-[11px] flex items-center gap-0.5">
-                    Open Sheet →
+                  <span className="text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform text-[11px] flex items-center gap-1">
+                    <Maximize2 className="w-3 h-3 text-rose-400" />
+                    <span>Full Screen →</span>
                   </span>
                 </div>
               </div>
             );
           })}
 
-          {/* Sequential ADD NEW PARADE STATE box for RSM & Admin at the end of the grid */}
-          {!isOfficerOrCo && (isActualRsm || isRsm || isAdmin) && (
+          {/* Sequential ADD NEW PARADE STATE box — exclusively visible to RSM & Admin */}
+          {(isActualRsm || isAdmin) && (
             <div
               id="btn-add-new-parade-state-box"
               onClick={() => setIsAddTypeModalOpen(true)}

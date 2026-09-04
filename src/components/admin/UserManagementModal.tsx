@@ -104,7 +104,32 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   onSaveUser,
   editUser,
 }) => {
-  const { personnelList, usersList } = useApp();
+  const { personnelList, usersList, ranksList, subUnitsList } = useApp();
+
+  const dynamicRanks = React.useMemo(() => {
+    if (ranksList && ranksList.length > 0) {
+      const seen = new Set<string>();
+      return ranksList
+        .filter((r) => r.isActive !== false)
+        .filter((r) => {
+          if (seen.has(r.name)) return false;
+          seen.add(r.name);
+          return true;
+        })
+        .map((r) => ({
+          rank: r.name,
+          category: r.category,
+        }));
+    }
+    return MILITARY_RANKS;
+  }, [ranksList]);
+
+  const dynamicBatteries = React.useMemo(() => {
+    if (subUnitsList && subUnitsList.length > 0) {
+      return subUnitsList.filter((u) => u.isActive !== false).map((u) => u.name as Battery);
+    }
+    return AVAILABLE_BATTERIES;
+  }, [subUnitsList]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTradeInfo, setSelectedTradeInfo] = useState<string>('');
@@ -492,7 +517,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                 onChange={(e) => handleRankChange(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
               >
-                {MILITARY_RANKS.map((r) => (
+                {dynamicRanks.map((r) => (
                   <option key={r.rank} value={r.rank}>
                     {r.rank} ({r.category})
                   </option>

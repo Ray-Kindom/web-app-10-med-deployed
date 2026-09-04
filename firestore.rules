@@ -73,6 +73,12 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
+    // 4b. /military_trades/{tradeId} - Military Trades & Specializations
+    match /military_trades/{tradeId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
     // 5. /auth_establishment/{estId} - Auth Establishment
     match /auth_establishment/{estId} {
       allow read: if true;
