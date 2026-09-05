@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useApp } from '../../context/AppContext';
+import { ParadeDutyHeadingBoxes } from './ParadeDutyHeadingBoxes';
 import {
   DailyParadePoint,
   Battery,
@@ -1006,8 +1007,16 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
           </form>
         )}
 
-        {/* Parade State Table */}
+        {/* Parade State Table & Duty Section */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+          {/* Duty Heading Boxes (1. Unit Sy, 2. working, 3. Fixed Duty, 4. Others) */}
+          <ParadeDutyHeadingBoxes
+            date={activeDate}
+            sessionType={sessionType}
+            isReadOnly={isReadOnly}
+            filterBattery={activeTab}
+          />
+
           <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md shadow-sm">

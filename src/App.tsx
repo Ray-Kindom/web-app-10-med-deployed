@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/common/Header';
-import { Sidebar } from './components/common/Sidebar';
 import { TopModuleNavBar } from './components/common/TopModuleNavBar';
 import { PersonnelDossierModal } from './components/personnel/PersonnelDossierModal';
 import { AddPersonnelModal } from './components/personnel/AddPersonnelModal';
@@ -20,6 +19,7 @@ import { RsmDashboardPage } from './pages/RsmDashboardPage';
 import { CoDashboardPage } from './pages/CoDashboardPage';
 import { OffrDashboardPage } from './pages/OffrDashboardPage';
 import { AdminPanelPage } from './pages/AdminPanelPage';
+import { DutyDetailPage } from './pages/DutyDetailPage';
 
 const AppContent: React.FC = () => {
   const {
@@ -31,7 +31,6 @@ const AppContent: React.FC = () => {
     setOutOfUnitModalOpen,
     activeOutOfUnitCategory,
   } = useApp();
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
 
   // Modal States
   const [dossierPerson, setDossierPerson] = useState<Personnel | null>(null);
@@ -80,6 +79,13 @@ const AppContent: React.FC = () => {
             onOpenPrintModal={() => setIsPrintModalOpen(true)}
           />
         );
+      case 'duty_detail':
+        return (
+          <DutyDetailPage
+            onViewDossier={handleViewDossier}
+            onOpenPrintModal={() => setIsPrintModalOpen(true)}
+          />
+        );
       case 'rsm_dashboard':
         return (
           <RsmDashboardPage
@@ -125,19 +131,12 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Top Header */}
       <Header
-        onToggleMobileNav={() => setIsMobileNavOpen(!isMobileNavOpen)}
         onOpenPrintModal={() => setIsPrintModalOpen(true)}
       />
 
       <div className="flex-1 flex max-w-[1700px] w-full mx-auto">
-        {/* Responsive Sidebar */}
-        <Sidebar
-          isOpenMobile={isMobileNavOpen}
-          onCloseMobile={() => setIsMobileNavOpen(false)}
-        />
-
-        {/* Main Content Area */}
-        <main className="flex-1 lg:pl-72 min-w-0 flex flex-col">
+        {/* Main Content Area (Full width, left sidebar removed) */}
+        <main className="flex-1 min-w-0 flex flex-col w-full">
           <TopModuleNavBar />
           <div className="p-2 sm:p-4 lg:p-5 max-w-[1700px] mx-auto w-full">{renderActivePage()}</div>
         </main>

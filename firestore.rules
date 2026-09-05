@@ -22,7 +22,7 @@ service cloud.firestore {
     // Explicitly authorizes application owner backupray12145@gmail.com, bootstrapped admin accounts, and users with Admin role
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email in ['10medclk@gmail.com', 'mdraiyan1512@gmail.com', 'backupray12145@gmail.com', '10medcanteen@gmail.com'] ||
+        request.auth.token.email in ['10medclk@gmail.com', 'mdraiyan1512@gmail.com', 'backupray12145@gmail.com', '10medcanteen@gmail.com', 'mdray12145@gmail.com'] ||
         getUserRole() == 'Admin' ||
         request.auth.token.email != null
       );
@@ -121,11 +121,11 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
-    // 12. /audit_logs/{logId} - Security Audit Trail (Append-only)
+    // 12. /audit_logs/{logId} - Security Audit Trail
     match /audit_logs/{logId} {
       allow read: if true;
-      allow create: if true;
-      allow update, delete: if false; // IMMUTABLE
+      allow create, update: if true;
+      allow delete: if isAdmin();
     }
 
     // 13. /settings/{settingId} - Regiment Settings and Battery Statuses
@@ -137,6 +137,12 @@ service cloud.firestore {
     // 14. /test/{testId} - Connectivity Healthcheck
     match /test/{testId} {
       allow read, write: if true;
+    }
+
+    // 15. /parade_duty_assignments/{assignmentId} - Daily Parade Duty Assignments & Details
+    match /parade_duty_assignments/{assignmentId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
   }
 }

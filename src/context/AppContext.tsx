@@ -16,6 +16,7 @@ import {
   ParadeRecordStatus,
   ParadeDutyAssignment,
   ParadeDutyCategory,
+  DutySessionStatus,
   SystemCategory,
   SubCategoryItem,
   SubUnitConfig,
@@ -43,6 +44,7 @@ import {
   INITIAL_AUTH_ESTABLISHMENT,
   INITIAL_CALCULATION_CONFIG,
 } from '../data/configData';
+import { calculateSimpleParadeState, SimpleParadeSummary, normalizeDutyName } from '../utils/paradeCalculations';
 import {
   db,
   auth,
@@ -94,6 +96,11 @@ interface AppContextType {
     totalAbsent: number;
     presentPercentage: number;
   };
+  getParadeSummary: (
+    batteryScope?: Battery | 'Consolidated',
+    date?: string,
+    sessionType?: string
+  ) => SimpleParadeSummary;
   activePage: string;
   setActivePage: (page: string) => void;
   selectedBatteryFilter: Battery | 'All';
@@ -186,6 +193,11 @@ interface AppContextType {
   removeParadeDutyAssignment: (id: string, date: string, sessionType: string) => void;
   clearParadeDutyAssignments: (date: string, sessionType: string, category?: ParadeDutyCategory) => void;
   getParadeDutyAssignments: (date: string, sessionType: string, category?: ParadeDutyCategory) => ParadeDutyAssignment[];
+  dutySessionStatuses: Record<string, DutySessionStatus>;
+  getDutySessionStatus: (date: string, sessionType: string) => DutySessionStatus;
+  saveDutySession: (date: string, sessionType: string) => void;
+  editDutySession: (date: string, sessionType: string) => void;
+  sendDutySessionToAdjt: (date: string, sessionType: string, notes?: string) => void;
 
   // Out Of Unit Management
   assignOutOfUnit: (
@@ -241,6 +253,7 @@ const STORAGE_KEYS = {
   PARADE_TYPES: '10med_parade_types_v1',
   PARADE_RECORDS: '10med_parade_records_v1',
   PARADE_DUTY_ASSIGNMENTS: '10med_parade_duty_assignments_v1',
+  PARADE_DUTY_STATUSES: '10med_parade_duty_statuses_v1',
   AUTH_STATUS: '10med_auth_status_v2',
   ACTIVE_PAGE: '10med_active_page_v2',
   SYSTEM_CATEGORIES: '10med_system_categories_v1',
@@ -531,22 +544,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Safe helper to sync to Firestore with structured error handling per SKILL.md
   const syncDoc = (promiseOrFn: (() => Promise<any>) | Promise<any>, description?: string) => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser) {
+      if (typeof promiseOrFn !== 'function' && promiseOrFn && typeof (promiseOrFn as any).catch === 'function') {
+        (promiseOrFn as any).catch(() => {
+          // Suppress unauthenticated background rejection in offline/local credentials mode
+        });
+      }
+      return;
+    }
     try {
       const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
       p?.catch?.((err: any) => {
-        try {
-          handleFirestoreError(err, OperationType.WRITE, description || null);
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.WRITE, description || null);
       });
     } catch (e: any) {
-      try {
-        handleFirestoreError(e, OperationType.WRITE, description || null);
-      } catch {
-        // Handled and logged with full FirestoreErrorInfo
-      }
+      handleFirestoreError(e, OperationType.WRITE, description || null);
     }
   };
 
@@ -864,10 +876,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): ParadeDutyAssignment[] => {
     const key = `${date}_${sessionType}`;
     const list = paradeDutyAssignments[key] || [];
+    const normalizedList = list.map((a) => ({
+      ...a,
+      dutyName: normalizeDutyName(a.dutyName || 'General'),
+    }));
     if (category) {
-      return list.filter((a) => a.category === category);
+      return normalizedList.filter((a) => a.category === category);
     }
-    return list;
+    return normalizedList;
   };
 
   const addParadeDutyAssignment = (
@@ -875,8 +891,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     const key = `${assignment.date}_${assignment.sessionType}`;
     const id = `${assignment.personnelId}_${assignment.category}_${Date.now()}`;
+    const normalizedDuty = normalizeDutyName(assignment.dutyName || 'General');
     const newRecord: ParadeDutyAssignment = {
       ...assignment,
+      dutyName: normalizedDuty,
       id,
       assignedAt: new Date().toISOString(),
       assignedBy: `${currentUser.rank} ${currentUser.name}`,
@@ -964,6 +982,151 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ),
       'clear parade duty assignments'
     );
+  };
+
+  // --- DUTY DETAILING WORKFLOW STATUS (Draft, Saved, Sent to Adjt) ---
+  const [dutySessionStatuses, setDutySessionStatuses] = useState<
+    Record<string, DutySessionStatus>
+  >(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PARADE_DUTY_STATUSES);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {};
+  });
+
+  const getDutySessionStatus = (date: string, sessionType: string): DutySessionStatus => {
+    const key = `${date}_${sessionType}`;
+    return dutySessionStatuses[key] || { status: 'Draft' };
+  };
+
+  const saveDutySession = (date: string, sessionType: string) => {
+    const key = `${date}_${sessionType}`;
+    const userDisplay = `${currentUser.rank} ${currentUser.name}`;
+    const now = new Date().toISOString();
+    const existing = dutySessionStatuses[key] || { status: 'Draft' };
+    const updated: DutySessionStatus = {
+      ...existing,
+      status: 'Saved',
+      savedAt: now,
+      savedBy: userDisplay,
+    };
+
+    setDutySessionStatuses((prev) => {
+      const next = { ...prev, [key]: updated };
+      localStorage.setItem(STORAGE_KEYS.PARADE_DUTY_STATUSES, JSON.stringify(next));
+      return next;
+    });
+
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_duty_assignments', key),
+        sanitizeForFirestore({
+          date,
+          sessionType,
+          status: 'Saved',
+          savedAt: now,
+          savedBy: userDisplay,
+        }),
+        { merge: true }
+      ),
+      'save duty session status'
+    );
+
+    addAuditLog(
+      'Saved Duty Detailing',
+      `Saved duty detailing for ${sessionType} session on ${date} by ${userDisplay}`,
+      'PARADE_STATE'
+    );
+
+    showNotification(`✅ Duty Detailing for ${sessionType} saved successfully (সংরক্ষিত হয়েছে)`);
+  };
+
+  const editDutySession = (date: string, sessionType: string) => {
+    const key = `${date}_${sessionType}`;
+    const userDisplay = `${currentUser.rank} ${currentUser.name}`;
+    const existing = dutySessionStatuses[key] || { status: 'Draft' };
+    const updated: DutySessionStatus = {
+      ...existing,
+      status: 'Draft',
+    };
+
+    setDutySessionStatuses((prev) => {
+      const next = { ...prev, [key]: updated };
+      localStorage.setItem(STORAGE_KEYS.PARADE_DUTY_STATUSES, JSON.stringify(next));
+      return next;
+    });
+
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_duty_assignments', key),
+        sanitizeForFirestore({
+          date,
+          sessionType,
+          status: 'Draft',
+        }),
+        { merge: true }
+      ),
+      'edit duty session status'
+    );
+
+    addAuditLog(
+      'Edit Duty Detailing',
+      `Unlocked edit mode for ${sessionType} duty detailing on ${date} by ${userDisplay}`,
+      'PARADE_STATE'
+    );
+
+    showNotification(`✏️ Edit mode enabled for ${sessionType} duty detailing (এডিট মোড সক্রিয়)`);
+  };
+
+  const sendDutySessionToAdjt = (date: string, sessionType: string, notes?: string) => {
+    if (isGuest) {
+      showNotification('গেস্ট মোডে অ্যাডজুট্যান্টের নিকট প্রেরণ করা যাবে না (GUEST — VIEW ONLY)।');
+      return;
+    }
+    const key = `${date}_${sessionType}`;
+    const userDisplay = `${currentUser.rank} ${currentUser.name}`;
+    const now = new Date().toISOString();
+    const existing = dutySessionStatuses[key] || { status: 'Draft' };
+    const updated: DutySessionStatus = {
+      ...existing,
+      status: 'Sent to Adjt',
+      sentToAdjtAt: now,
+      sentToAdjtBy: userDisplay,
+      notes: notes || undefined,
+    };
+
+    setDutySessionStatuses((prev) => {
+      const next = { ...prev, [key]: updated };
+      localStorage.setItem(STORAGE_KEYS.PARADE_DUTY_STATUSES, JSON.stringify(next));
+      return next;
+    });
+
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_duty_assignments', key),
+        sanitizeForFirestore({
+          date,
+          sessionType,
+          status: 'Sent to Adjt',
+          sentToAdjtAt: now,
+          sentToAdjtBy: userDisplay,
+          notes: notes || null,
+        }),
+        { merge: true }
+      ),
+      'send duty session to adjt'
+    );
+
+    addAuditLog(
+      'Sent to Adjt',
+      `Dispatched ${sessionType} duty detailing & parade state for ${date} to Adjutant by ${userDisplay}. Notes: ${notes || 'None'}`,
+      'PARADE_STATE'
+    );
+
+    showNotification(`🎖️ Duty Detailing & Parade State sent to Adjutant successfully (অ্যাডজুট্যান্টের নিকট প্রেরিত হয়েছে)!`);
   };
 
   const addParadeType = (name: string, headings?: string[]) => {
@@ -1611,6 +1774,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               user.email === '10medclk@gmail.com' ||
               user.email === 'mdraiyan1512@gmail.com' ||
               user.email === 'backupray12145@gmail.com' ||
+              user.email === 'mdray12145@gmail.com' ||
               existing.role === 'Admin';
             if (isLead) {
               existing.role = 'Admin';
@@ -1671,6 +1835,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       firebaseUser.email === '10medclk@gmail.com' ||
       firebaseUser.email === 'mdraiyan1512@gmail.com' ||
       firebaseUser.email === 'backupray12145@gmail.com' ||
+      firebaseUser.email === 'mdray12145@gmail.com' ||
       currentUser.role === 'Admin' ||
       isRealAdmin;
 
@@ -1689,11 +1854,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'users');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'users');
       }
     );
 
@@ -1713,11 +1874,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'personnel');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'personnel');
       }
     );
 
@@ -1737,11 +1894,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'parade_points');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'parade_points');
       }
     );
 
@@ -1759,11 +1912,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'duty_roster');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'duty_roster');
       }
     );
 
@@ -1783,11 +1932,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'audit_logs');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'audit_logs');
       }
     );
 
@@ -1803,11 +1948,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'settings/regiment_settings');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'settings/regiment_settings');
       }
     );
 
@@ -1838,11 +1979,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'parade_types');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'parade_types');
       }
     );
 
@@ -1860,11 +1997,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'parade_records');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'parade_records');
       }
     );
 
@@ -1885,11 +2018,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'system_categories');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'system_categories');
       }
     );
 
@@ -1910,11 +2039,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'sub_units');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'sub_units');
       }
     );
 
@@ -1935,11 +2060,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'military_ranks');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'military_ranks');
       }
     );
 
@@ -1960,11 +2081,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'military_trades');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'military_trades');
       }
     );
 
@@ -1983,11 +2100,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'auth_establishment');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
-        }
+        handleFirestoreError(err, OperationType.GET, 'auth_establishment');
       }
     );
 
@@ -2010,11 +2123,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       },
       (err) => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'calculation_config');
-        } catch {
-          // Handled and logged with full FirestoreErrorInfo
+        handleFirestoreError(err, OperationType.GET, 'calculation_config');
+      }
+    );
+
+    // 14. /parade_duty_assignments listener
+    const unsubParadeDutyAssignments = onSnapshot(
+      collection(db, 'parade_duty_assignments'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const map: Record<string, ParadeDutyAssignment[]> = {};
+          const statusMap: Record<string, DutySessionStatus> = {};
+          snapshot.docs.forEach((d) => {
+            const data = d.data();
+            if (data?.assignments && Array.isArray(data.assignments)) {
+              map[d.id] = data.assignments as ParadeDutyAssignment[];
+            }
+            if (data?.status) {
+              statusMap[d.id] = {
+                status: data.status,
+                savedAt: data.savedAt,
+                savedBy: data.savedBy,
+                sentToAdjtAt: data.sentToAdjtAt,
+                sentToAdjtBy: data.sentToAdjtBy,
+                notes: data.notes,
+              };
+            }
+          });
+          setParadeDutyAssignments((prev) => {
+            const next = { ...prev, ...map };
+            localStorage.setItem(STORAGE_KEYS.PARADE_DUTY_ASSIGNMENTS, JSON.stringify(next));
+            return next;
+          });
+          setDutySessionStatuses((prev) => {
+            const next = { ...prev, ...statusMap };
+            localStorage.setItem(STORAGE_KEYS.PARADE_DUTY_STATUSES, JSON.stringify(next));
+            return next;
+          });
         }
+      },
+      (err) => {
+        handleFirestoreError(err, OperationType.GET, 'parade_duty_assignments');
       }
     );
 
@@ -2033,6 +2182,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubTrades();
       unsubAuth();
       unsubCalc();
+      unsubParadeDutyAssignments();
     };
   }, [firebaseUser, currentUser.role]);
 
@@ -2810,6 +2960,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
+  const getParadeSummary = (
+    batteryScope: Battery | 'Consolidated' = 'Consolidated',
+    date: string = selectedParadeDate,
+    sessionType: string = 'Morning'
+  ): SimpleParadeSummary => {
+    const rawDuty = getParadeDutyAssignments(date, sessionType);
+    return calculateSimpleParadeState(personnelList, rawDuty, batteryScope);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -2836,6 +2995,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addAuditLog,
         getBatterySummaries,
         getRegimentalTotals,
+        getParadeSummary,
         activePage,
         setActivePage,
         selectedBatteryFilter,
@@ -2922,6 +3082,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addParadeDutyAssignment,
         removeParadeDutyAssignment,
         clearParadeDutyAssignments,
+        dutySessionStatuses,
+        getDutySessionStatus,
+        saveDutySession,
+        editDutySession,
+        sendDutySessionToAdjt,
 
         assignOutOfUnit,
         cancelOutOfUnit,

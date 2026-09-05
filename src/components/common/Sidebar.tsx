@@ -10,6 +10,7 @@ import {
   Settings,
   ChevronRight,
   Shield,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -116,6 +117,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
     });
     items.push({
+      id: 'duty_detail',
+      label: 'Duty Detailing',
+      description: 'RSM Duty Allocation Board',
+      icon: ShieldAlert,
+      badge: 'Duty',
+      badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+    });
+    items.push({
       id: 'master_personnel',
       label: 'Regt Nominal',
       description: 'All 10 Med Regt Nominal Roll',
@@ -190,6 +199,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ClipboardList,
       badge: 'Live',
       badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+    });
+    items.push({
+      id: 'duty_detail',
+      label: 'Duty Detailing',
+      description: 'RSM Duty Allocation Board',
+      icon: ShieldAlert,
+      badge: 'Duty',
+      badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
     });
     items.push({
       id: 'master_personnel',

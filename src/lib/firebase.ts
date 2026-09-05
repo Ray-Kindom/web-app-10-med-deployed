@@ -59,10 +59,10 @@ try {
 
 export const db = firestoreInstance;
 
-// Validate connection to Firestore as mandated by SKILL.md
+// Validate connection to Firestore
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    await getDocFromServer(doc(db, 'settings', 'regiment_settings'));
     return true;
   } catch (error: any) {
     if (
@@ -74,7 +74,7 @@ export async function testConnection(): Promise<boolean> {
       console.warn('Firestore connectivity notice: client operating in local cache mode.');
       return false;
     }
-    // Any other response (such as document not found or permission check) means endpoint is reachable
+    // Any other response (such as document not found) means endpoint is reachable
     return true;
   }
 }

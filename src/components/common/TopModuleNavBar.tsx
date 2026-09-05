@@ -6,6 +6,8 @@ import {
   Building2,
   ClipboardList,
   Settings,
+  ShieldAlert,
+  Edit3,
 } from 'lucide-react';
 
 export const TopModuleNavBar: React.FC = () => {
@@ -13,6 +15,8 @@ export const TopModuleNavBar: React.FC = () => {
     activePage,
     setActivePage,
     currentUser,
+    setDailyParadeModalOpen,
+    isRealAdmin,
   } = useApp();
 
   const role = currentUser.role;
@@ -48,6 +52,13 @@ export const TopModuleNavBar: React.FC = () => {
       label: 'Regt Nominal',
       icon: Users,
     });
+    tabs.push({
+      id: 'data_update',
+      label: 'Data Update',
+      icon: Edit3,
+      badge: 'Edit',
+      action: () => setDailyParadeModalOpen(true),
+    });
   } else if (isRsm) {
     tabs.push({
       id: 'main_dashboard',
@@ -60,9 +71,21 @@ export const TopModuleNavBar: React.FC = () => {
       icon: ClipboardList,
     });
     tabs.push({
+      id: 'duty_detail',
+      label: 'Duty Detailing',
+      icon: ShieldAlert,
+    });
+    tabs.push({
       id: 'master_personnel',
       label: 'Regt Nominal',
       icon: Users,
+    });
+    tabs.push({
+      id: 'data_update',
+      label: 'Data Update',
+      icon: Edit3,
+      badge: 'Muster',
+      action: () => setDailyParadeModalOpen(true),
     });
   } else if (isCoOrOffr) {
     tabs.push({
@@ -103,10 +126,31 @@ export const TopModuleNavBar: React.FC = () => {
       icon: ClipboardList,
     });
     tabs.push({
+      id: 'duty_detail',
+      label: 'Duty Detailing',
+      icon: ShieldAlert,
+    });
+    tabs.push({
       id: 'master_personnel',
       label: 'Regt Nominal',
       icon: Users,
     });
+    tabs.push({
+      id: 'data_update',
+      label: 'Data Update',
+      icon: Edit3,
+      badge: 'Edit',
+      action: () => setDailyParadeModalOpen(true),
+    });
+    tabs.push({
+      id: 'admin_panel',
+      label: 'Admin Panel',
+      icon: Settings,
+      badge: 'Admin',
+    });
+  }
+
+  if (isRealAdmin && !tabs.some((t) => t.id === 'admin_panel')) {
     tabs.push({
       id: 'admin_panel',
       label: 'Admin Panel',

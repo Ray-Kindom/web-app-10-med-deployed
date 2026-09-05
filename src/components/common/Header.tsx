@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 interface HeaderProps {
-  onToggleMobileNav: () => void;
+  onToggleMobileNav?: () => void;
   onOpenPrintModal?: () => void;
 }
 
@@ -131,15 +131,17 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="max-w-[1700px] mx-auto px-3 sm:px-4">
         <div className="flex items-center justify-between h-12 sm:h-13 gap-2.5">
-          {/* Left: Mobile Menu Button & Brand */}
+          {/* Left: Brand / Logo */}
           <div className="flex items-center gap-2.5">
-            <button
-              onClick={onToggleMobileNav}
-              className="lg:hidden p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white"
-              aria-label="Open Navigation Menu"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
+            {onToggleMobileNav && (
+              <button
+                onClick={onToggleMobileNav}
+                className="lg:hidden p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white"
+                aria-label="Open Navigation Menu"
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            )}
 
             <div
               onClick={() => setActivePage('main_dashboard')}

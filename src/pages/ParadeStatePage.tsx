@@ -6,6 +6,7 @@ import { LeaveModal } from '../components/parade/LeaveModal';
 import { CourseModal } from '../components/parade/CourseModal';
 import { SickModal } from '../components/parade/SickModal';
 import { DailyParadeStateModal } from '../components/parade/DailyParadeStateModal';
+import { ParadeStateSummaryModal } from '../components/parade/ParadeStateSummaryModal';
 import { Personnel, Battery, isOfficerRank } from '../types';
 import {
   Plus,
@@ -19,6 +20,9 @@ import {
   Maximize2,
   ChevronDown,
   Check,
+  Eye,
+  ShieldAlert,
+  ArrowRight,
 } from 'lucide-react';
 
 const PARADE_TYPE_DROPDOWN_OPTIONS = [
@@ -57,6 +61,8 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
     confirmBatteryParadeRecord,
     finalizeParadeType,
     dailyParadePoints,
+    setActivePage,
+    getParadeDutyAssignments,
   } = useApp();
 
   const [activeModalSession, setActiveModalSession] = useState<string | null>(null);
@@ -69,6 +75,7 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [isSickModalOpen, setIsSickModalOpen] = useState(false);
   const [isComdModalOpen, setIsComdModalOpen] = useState(false);
+  const [selectedDutySession, setSelectedDutySession] = useState<string>('Morning');
 
   const totals = getRegimentalTotals();
   const isOfficerOrCo =
@@ -81,6 +88,7 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
   const isBsm = !isOfficerOrCo && ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
   const isRsm = !isOfficerOrCo && (currentUser.role === 'RSM' || currentUser.role === 'Admin' || isAdmin);
   const assignedBty = (currentUser.assignedBattery as Battery) || 'P Bty';
+  const isReadOnly = isOfficerOrCo || currentUser.role === 'Guest';
 
   // Filter out soft-deleted/archived parade states for normal display across all dashboards
   const activeParadeTypes = useMemo(() => {
@@ -191,80 +199,57 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Prominent Regimental Header with Date Selector & Quick Entry */}
-      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-              CORE PARADE STATE MODULE
-            </span>
-            <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              {isBsm ? `BSM Entry: ${assignedBty}` : 'Regimental Console (RSM / Admin)'}
-            </span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight font-sans mt-0.5">
-            Daily Parade State Console (দৈনিক প্যারেড স্টেট)
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Select a session card below or click Quick Entry to easily record attendance and muster strength
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Quick Date Switcher */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-700/80 shadow-inner">
-            <button
-              onClick={() => {
-                const d = new Date(selectedParadeDate);
-                d.setDate(d.getDate() - 1);
-                setSelectedParadeDate(d.toISOString().slice(0, 10));
-              }}
-              className="px-2 py-1 rounded-lg text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Previous Day"
-            >
-              ← Prev
-            </button>
-            <input
-              type="date"
-              value={selectedParadeDate}
-              onChange={(e) => e.target.value && setSelectedParadeDate(e.target.value)}
-              className="bg-transparent text-white font-mono font-bold text-xs px-2 py-1 focus:outline-none cursor-pointer"
-            />
-            <button
-              onClick={() => {
-                setSelectedParadeDate(new Date().toISOString().slice(0, 10));
-              }}
-              className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-              title="Today"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => {
-                const d = new Date(selectedParadeDate);
-                d.setDate(d.getDate() + 1);
-                setSelectedParadeDate(d.toISOString().slice(0, 10));
-              }}
-              className="px-2 py-1 rounded-lg text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Next Day"
-            >
-              Next →
-            </button>
-          </div>
-
-          {/* Primary Quick Entry Button */}
+      {/* Date Selector Only (No Box, No Quick Entry) */}
+      <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap pb-1">
+        <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 shadow-inner">
+          <Calendar className="w-4 h-4 text-slate-400 ml-1.5" />
+          <span className="text-xs font-mono text-slate-400 font-medium">Date:</span>
           <button
-            onClick={() => setActiveModalSession(activeParadeTypes[0]?.name || 'Morning')}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-rose-950/50 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+            type="button"
+            onClick={() => {
+              const d = new Date(selectedParadeDate);
+              d.setDate(d.getDate() - 1);
+              setSelectedParadeDate(d.toISOString().slice(0, 10));
+            }}
+            className="px-2 py-1 rounded-lg text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Previous Day"
           >
-            <span>⚡ Quick Entry (এন্ট্রি দিন)</span>
+            ← Prev
+          </button>
+          <input
+            type="date"
+            value={selectedParadeDate}
+            onChange={(e) => e.target.value && setSelectedParadeDate(e.target.value)}
+            className="bg-slate-900 text-white font-mono font-bold text-xs px-2.5 py-1 rounded-lg border border-slate-700/80 focus:outline-none focus:border-rose-500 cursor-pointer"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedParadeDate(new Date().toISOString().slice(0, 10));
+            }}
+            className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+            title="Today"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const d = new Date(selectedParadeDate);
+              d.setDate(d.getDate() + 1);
+              setSelectedParadeDate(d.toISOString().slice(0, 10));
+            }}
+            className="px-2 py-1 rounded-lg text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Next Day"
+          >
+            Next →
           </button>
         </div>
       </div>
 
       {/* PRIMARY PARADE STATE TYPE BOXES/CARDS (Morning, Second Period, Games + Dynamic) */}
       <div className="space-y-2">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {activeParadeTypes.map((type) => {
             const btyRecord = getParadeRecord(selectedParadeDate, type.name, assignedBty);
             const badge = getStatusBadge(btyRecord.status);
@@ -282,28 +267,13 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
               <div
                 key={type.id}
                 onClick={() => setActiveModalSession(type.name)}
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border-2 border-slate-800 hover:border-rose-500 p-5 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-rose-950/40 cursor-pointer flex flex-col justify-between min-h-[260px]"
+                className="relative overflow-hidden rounded-xl border border-slate-800/80 hover:border-emerald-500/60 bg-gradient-to-b from-slate-900/90 to-slate-950 p-3 sm:p-3.5 shadow-md shadow-slate-950/30 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 group flex flex-col justify-between"
               >
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 group-hover:scale-110 group-hover:bg-rose-500/25 transition-all flex items-center justify-center shadow-lg shadow-rose-950/30">
-                        {getParadeTypeIcon(type.name)}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-black text-white group-hover:text-rose-300 transition-colors font-sans leading-tight">
-                          {type.name} Parade State
-                        </h3>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
-                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Date: <strong className="text-slate-200">{selectedParadeDate}</strong></span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${badge.bg}`}>
-                        {badge.text}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block truncate font-mono">
+                        {type.name} Parade
                       </span>
                       {canDelete && (
                         <button
@@ -315,59 +285,35 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
                             }
                           }}
                           title={`Delete ${type.name} Parade State`}
-                          className="p-1 rounded-md text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 transition-colors cursor-pointer border border-rose-500/30 bg-rose-500/10"
+                          className="text-slate-500 hover:text-rose-400 transition-colors p-0.5"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       )}
                     </div>
-                  </div>
 
-                  {/* Highlighted Big Metric Box */}
-                  <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 flex items-center justify-between group-hover:border-emerald-500/40 transition-colors shadow-inner">
-                    <div>
-                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                        On Parade / হাজির
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-mono mt-0.5 block">
-                        {isBsm ? `${assignedBty} Strength` : 'Regimental Strength'}
-                      </span>
-                    </div>
-                    <div className="text-right font-mono">
-                      <span className="text-3xl sm:text-4xl font-black text-emerald-400 tracking-tight">
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <span className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-white">
                         {stats.count}
                       </span>
-                      <span className="text-xs text-slate-400 ml-1 font-bold">
-                        Troops
+                      <span className="text-[11px] font-semibold font-mono text-emerald-400">
+                        On Parade
                       </span>
                     </div>
+
+                    <p className="mt-0.5 text-[11px] text-slate-400 font-mono truncate">
+                      {selectedParadeDate} • {badge.text}
+                    </p>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0 group-hover:scale-105 transition-transform">
+                    {getParadeTypeIcon(type.name)}
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-3 pt-3 border-t border-slate-800/80">
-                  <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-                    <span className="text-[11px] flex items-center gap-1 text-slate-400">
-                      <Clock className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Last Edit: <strong className="text-slate-300">{stats.lastEditTime}</strong></span>
-                    </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                      {!isDefaultType ? 'RSM Custom' : 'Standard'}
-                    </span>
-                  </div>
-
-                  {/* PROMINENT PRIMARY ACTION BUTTON */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveModalSession(type.name);
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 via-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-950/40 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
-                  >
-                    <span>⚡ Open &amp; Enter Parade State (এন্ট্রি দিন)</span>
-                    <span className="text-rose-200">→</span>
-                  </button>
+                <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-500">
+                  <span>Edit: {stats.lastEditTime}</span>
+                  <span className="text-slate-400 font-semibold">{isBsm ? assignedBty : 'Regiment'}</span>
                 </div>
               </div>
             );
@@ -383,20 +329,58 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
                 setIsTypeDropdownOpen(false);
                 setIsAddTypeModalOpen(true);
               }}
-              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900/50 via-slate-900/70 to-slate-950 border-2 border-dashed border-slate-700/80 hover:border-purple-500/80 p-5 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-purple-950/30 cursor-pointer flex flex-col items-center justify-center min-h-[260px] text-center"
+              className="relative overflow-hidden rounded-xl border border-dashed border-slate-700/80 hover:border-purple-500/60 bg-gradient-to-b from-purple-950/10 to-slate-900/60 p-3 sm:p-3.5 shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-0.5 flex flex-col justify-center items-center text-center group min-h-[90px]"
             >
-              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/30 group-hover:scale-110 group-hover:bg-purple-500/20 group-hover:border-purple-500/50 transition-all flex items-center justify-center text-purple-400 mb-3 shadow-inner">
-                <Plus className="w-8 h-8" />
+              <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 mb-1 group-hover:scale-105 transition-transform">
+                <Plus className="w-4 h-4" />
               </div>
-              <span className="text-sm font-bold font-mono tracking-wider text-slate-200 group-hover:text-purple-300 transition-colors uppercase">
-                ADD NEW PARADE STATE
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300 group-hover:text-purple-300 font-mono">
+                + Add Parade State
               </span>
-              <span className="text-[11px] text-slate-500 font-mono mt-1">
-                Click to configure new session
+              <span className="text-[10px] text-slate-500 font-mono mt-0.5">
+                RSM / Admin
               </span>
             </div>
           )}
         </div>
+      </div>
+
+      {/* Duty Detailing Section - Relocated to Dedicated Full Board for RSM between Parade State and Regt Nominal */}
+      <div
+        id="section-duty-detailing-navigator"
+        className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/80 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0">
+            <ShieldAlert className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-xs sm:text-sm font-bold text-white font-sans">
+                Duty Detailing Board
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Dedicated Page
+              </span>
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                {getParadeDutyAssignments(selectedParadeDate, selectedDutySession).length} Detailed ({selectedDutySession})
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">
+              Separate full board for RSM duty allocation (Unit Sy, Working Parties, Fixed Duty &amp; Others).
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          id="btn-nav-to-full-duty-board"
+          onClick={() => setActivePage('duty_detail')}
+          className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-rose-950/40 cursor-pointer shrink-0"
+        >
+          <span>Open Full Duty Board</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Updt Out Of Unit Action Control Box (Only accessible to RSM and BSM) */}
@@ -438,14 +422,14 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
           onViewDossier(p);
         }}
       />
-      {/* Active Session DailyParadeStateModal (Morning, Second Period, Games, Roll Call etc.) */}
+      {/* Active Session ParadeStateSummaryModal (Morning, Second Period, Games, Roll Call etc.) - Read Only Summary */}
       {activeModalSession && (
-        <DailyParadeStateModal
+        <ParadeStateSummaryModal
           isOpen={Boolean(activeModalSession)}
           onClose={() => setActiveModalSession(null)}
           sessionType={activeModalSession}
           date={selectedParadeDate}
-          defaultBattery={isBsm ? assignedBty : undefined}
+          defaultBattery={isBsm ? assignedBty : 'P Bty'}
           onOpenPrintModal={onOpenPrintModal}
         />
       )}

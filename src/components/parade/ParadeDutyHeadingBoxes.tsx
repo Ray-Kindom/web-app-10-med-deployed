@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ParadeDutyCategory, ParadeDutyAssignment, Battery, ALL_BATTERIES } from '../../types';
+import { ParadeDutyCategory, Battery } from '../../types';
+import { normalizeDutyName } from '../../utils/paradeCalculations';
 import {
   Shield,
   Wrench,
@@ -10,10 +11,6 @@ import {
   Plus,
   Trash2,
   X,
-  UserCheck,
-  CheckCircle2,
-  AlertCircle,
-  Users,
   ChevronDown,
 } from 'lucide-react';
 
@@ -28,9 +25,7 @@ interface DutyBoxDefinition {
   category: ParadeDutyCategory;
   num: string;
   title: string;
-  subTitle: string;
   icon: React.ComponentType<{ className?: string }>;
-  colorScheme: 'emerald' | 'amber' | 'indigo' | 'rose';
   defaultRoles: string[];
 }
 
@@ -39,70 +34,61 @@ const DUTY_BOXES: DutyBoxDefinition[] = [
     category: 'Unit Sy',
     num: '1.',
     title: 'Unit Sy',
-    subTitle: 'Unit Security & Guards (ক্যাম্প সিকিউরিটি)',
     icon: Shield,
-    colorScheme: 'emerald',
     defaultRoles: [
-      'Regt Guard (রেজিমেন্টাল গার্ড)',
-      'Main Gate Guard (মেইন গেট গার্ড)',
-      'RP Duty (রেজিমেন্টাল পুলিশ)',
-      'Magazine Guard (ম্যাগাজিন গার্ড)',
-      'Quarter Guard (কোয়ার্টার গার্ড)',
-      'Kot Guard (কোট গার্ড)',
-      'Perimeter Patrol (পেরিমিটার পেট্রোল)',
-      'Camp Security (সিকিউরিটি ডিউটি)',
+      'Quarter Guard',
+      'Main Gate Guard',
+      'RP Duty',
+      'Magazine Guard',
+      'Kot Guard',
+      'Perimeter Patrol',
+      'Camp Security',
     ],
   },
   {
     category: 'working',
     num: '2.',
     title: 'working',
-    subTitle: 'Working Party & Fatigue (ওয়ার্কিং পার্টি)',
     icon: Wrench,
-    colorScheme: 'amber',
     defaultRoles: [
-      'Camp Cleaning (ক্যাম্প পরিষ্কার)',
-      'Fresh Ration Party (ফ্রেশ রেশন পার্টি)',
-      'Dry Ration Party (ড্রাই রেশন পার্টি)',
-      'Ammo Working (অ্যামোনিশন ওয়ার্কিং)',
-      'Store Working (স্টোর ওয়ার্কিং)',
-      'MT Maintenance / Wash (এমটি রক্ষণাবেক্ষণ)',
-      'Line Maintenance (লাইন ফ্যাটিগ)',
-      'Fire Fighting Party (ফায়ার ফাইটিং)',
+      'Camp Cleaning',
+      'Fresh Ration Party',
+      'Dry Ration Party',
+      'Ammo Working',
+      'Store Working',
+      'MT Maintenance / Wash',
+      'Line Fatigue',
+      'Fire Fighting Party',
     ],
   },
   {
     category: 'Fixed Duty',
     num: '3.',
     title: 'Fixed Duty',
-    subTitle: 'Fixed Regimental Duties (ফিক্সড ডিউটি)',
     icon: Clock,
-    colorScheme: 'indigo',
     defaultRoles: [
-      'Cook / Cookhouse (কুক / মেস স্টাফ)',
-      'MT Driver (এমটি ড্রাইভার)',
-      'Radio Operator (রেডিও অপারেটর/সিগস)',
-      'Bty Clerk / Office (ব্যাটারি ক্লার্ক / অফিস)',
-      'Water Carrier (ওয়াটার ক্যারিয়ার)',
-      'Electrician / Gen Op (ইলেকট্রিশিয়ান / জেনারেটর)',
-      'Armament Artificer (আর্মামেন্ট আর্টিফিসার)',
-      'Barber / Cobbler / Washerman (বারবার / মুচি)',
+      'Cook / Cookhouse',
+      'MT Driver',
+      'Radio Operator',
+      'Bty Clerk / Office',
+      'Water Carrier',
+      'Electrician / Gen Op',
+      'Armament Artificer',
+      'Barber / Cobbler / Washerman',
     ],
   },
   {
     category: 'Others',
     num: '4.',
     title: 'Others',
-    subTitle: 'Other Out & Station Duties (অন্যান্য ডিউটি)',
     icon: Layers,
-    colorScheme: 'rose',
     defaultRoles: [
-      'General Duty (GD) (জেনারেল ডিউটি)',
-      'Special Assignment (স্পেশাল ডিউটি)',
-      'MI Room Attendant (এমআই রুম / মেডিকেল)',
-      'Sports Cadre (স্পোর্টস ক্যাডার)',
-      'Escort Duty (এসকোর্ট ডিউটি)',
-      'Admin Duty (অ্যাডমিন ডিউটি)',
+      'General Duty (GD)',
+      'Special Assignment',
+      'MI Room Attendant',
+      'Sports Cadre',
+      'Escort Duty',
+      'Admin Duty',
     ],
   },
 ];
@@ -120,13 +106,12 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
     removeParadeDutyAssignment,
     clearParadeDutyAssignments,
     showNotification,
-    currentUser,
   } = useApp();
 
-  // Selected Active Category Box (null means collapsed, or defaults to open on first category when clicked)
-  const [activeCategory, setActiveCategory] = useState<ParadeDutyCategory | null>(null);
+  // Active Category (defaults to Unit Sy for immediate entry readiness)
+  const [activeCategory, setActiveCategory] = useState<ParadeDutyCategory | null>('Unit Sy');
 
-  // Selected Duty Name from dropdown
+  // Selected Duty Role from dropdown
   const [selectedDutyName, setSelectedDutyName] = useState<string>('');
   const [customDutyInput, setCustomDutyInput] = useState<string>('');
   const [isCustomDuty, setIsCustomDuty] = useState(false);
@@ -177,10 +162,9 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
       setCustomDutyInput('');
       setSearchQuery('');
       setIsSearchOpen(false);
-      // Auto-focus search box
       setTimeout(() => {
         searchInputRef.current?.focus();
-      }, 100);
+      }, 80);
     }
   }, [activeCategory, activeBoxDef]);
 
@@ -201,16 +185,15 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
     const q = searchQuery.toLowerCase().trim();
     return personnelList
       .filter((p) => {
-        // Battery constraint if filtered
         if (filterBattery && filterBattery !== 'Consolidated' && p.battery !== filterBattery) {
           return false;
         }
-        const matchesArmyNo = p.armyNo.toLowerCase().includes(q);
-        const matchesName = p.name.toLowerCase().includes(q);
-        const matchesRank = p.rank.toLowerCase().includes(q);
-        return matchesArmyNo || matchesName || matchesRank;
+        const soldierSnkNo = (p.snkNo || (p as any).armyNo || '').toLowerCase();
+        const soldierName = (p.name || '').toLowerCase();
+        const soldierRank = (p.rk || (p as any).rank || '').toLowerCase();
+        return soldierSnkNo.includes(q) || soldierName.includes(q) || soldierRank.includes(q);
       })
-      .slice(0, 10);
+      .slice(0, 8);
   }, [personnelList, searchQuery, filterBattery]);
 
   // Handle adding a soldier
@@ -221,23 +204,26 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
       return;
     }
 
-    const finalDuty = isCustomDuty && customDutyInput.trim() ? customDutyInput.trim() : selectedDutyName;
+    const rawDuty = isCustomDuty && customDutyInput.trim() ? customDutyInput.trim() : selectedDutyName;
+    const finalDuty = normalizeDutyName(rawDuty);
 
     if (!finalDuty) {
       showNotification('Please select or enter a duty name first.');
       return;
     }
 
-    // Check if already assigned to this duty
+    const soldierSnk = soldier.snkNo || (soldier as any).armyNo || '';
+    const soldierRank = (soldier.rk || (soldier as any).rank || '') as string;
+
     const alreadyAssigned = allAssignments.some(
       (a) => a.personnelId === soldier.id && a.category === activeCategory
     );
 
     addParadeDutyAssignment({
       personnelId: soldier.id,
-      snkNo: soldier.armyNo,
+      snkNo: soldierSnk,
       name: soldier.name,
-      rank: soldier.rank,
+      rank: soldierRank,
       battery: soldier.battery,
       category: activeCategory,
       dutyName: finalDuty,
@@ -246,12 +232,11 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
     });
 
     if (alreadyAssigned) {
-      showNotification(`Updated ${soldier.rank} ${soldier.name} duty to: ${finalDuty}`);
+      showNotification(`Updated ${soldierRank} ${soldier.name} duty to: ${finalDuty}`);
     } else {
-      showNotification(`✅ Added ${soldier.rank} ${soldier.name} (${soldier.armyNo}) to ${activeCategory}!`);
+      showNotification(`Added ${soldierRank} ${soldier.name} (${soldierSnk}) to ${activeCategory}`);
     }
 
-    // Clear search and refocus so more soldiers can be continuously added ("evabe aro add kora jaabe")
     setSearchQuery('');
     setIsSearchOpen(false);
     setTimeout(() => {
@@ -260,12 +245,7 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
   };
 
   const handleBoxClick = (cat: ParadeDutyCategory) => {
-    if (activeCategory === cat) {
-      // Toggle or keep open
-      setActiveCategory(cat);
-    } else {
-      setActiveCategory(cat);
-    }
+    setActiveCategory((prev) => (prev === cat ? null : cat));
   };
 
   const activeCategoryAssignments = useMemo(() => {
@@ -273,177 +253,135 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
     return displayAssignments.filter((a) => a.category === activeCategory);
   }, [displayAssignments, activeCategory]);
 
+  // Group active category assignments by sub-category (dutyName) in list order
+  const groupedSubCategories = useMemo(() => {
+    if (!activeCategory || activeCategoryAssignments.length === 0) return [];
+
+    const map = new Map<string, typeof activeCategoryAssignments>();
+    activeCategoryAssignments.forEach((a) => {
+      const duty = normalizeDutyName(a.dutyName || 'General');
+      if (!map.has(duty)) {
+        map.set(duty, []);
+      }
+      map.get(duty)!.push({
+        ...a,
+        dutyName: duty,
+      });
+    });
+
+    const defaultRoles = activeBoxDef?.defaultRoles || [];
+    const sortedDuties = Array.from(map.keys()).sort((a, b) => {
+      const idxA = defaultRoles.indexOf(a);
+      const idxB = defaultRoles.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    return sortedDuties.map((duty) => ({
+      dutyName: duty,
+      personnel: map.get(duty)!,
+    }));
+  }, [activeCategory, activeCategoryAssignments, activeBoxDef]);
+
   return (
-    <div className="w-full space-y-3 bg-slate-950/80 p-3 sm:p-4 rounded-2xl border border-slate-800 shadow-xl">
-      {/* Top Banner / Heading Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400">
-            <Users className="w-4 h-4" />
-          </div>
-          <div>
-            <h4 className="text-xs sm:text-sm font-black text-white tracking-wide uppercase font-sans flex items-center gap-2">
-              <span>Duty &amp; Working Personnel Roster (ডিউটি ও ওয়ার্কিং পার্সোনেল এন্ট্রি)</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                {displayAssignments.length} Total Detailed
-              </span>
-            </h4>
-            <p className="text-[11px] text-slate-400 font-mono">
-              Click any heading box below to assign soldiers to Unit Sy, Working, Fixed Duty, or Others.
-            </p>
-          </div>
-        </div>
-
-        {activeCategory && (
-          <button
-            type="button"
-            onClick={() => setActiveCategory(null)}
-            className="self-end sm:self-auto text-[11px] font-mono font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700/80 transition-colors"
-          >
-            Close Panel ✕
-          </button>
-        )}
-      </div>
-
-      {/* 4 HEADING BOXES (1. Unit Sy, 2. working, 3. Fixed Duty, 4. Others) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+    <div className="w-full space-y-2.5">
+      {/* 1. CATEGORY BOXES AT THE TOP (SMALL & SIMPLE WITH DIGIT COUNT) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {DUTY_BOXES.map((box) => {
           const Icon = box.icon;
           const isSelected = activeCategory === box.category;
           const count = categoryCounts[box.category];
 
-          // Dynamic colors based on category
-          const colorClasses = {
-            emerald: {
-              activeBorder: 'border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-950/40',
-              hoverBorder: 'hover:border-emerald-500/60',
-              iconBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-              badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-              textColor: 'text-emerald-400',
-            },
-            amber: {
-              activeBorder: 'border-amber-500 ring-2 ring-amber-500/30 bg-amber-950/40',
-              hoverBorder: 'hover:border-amber-500/60',
-              iconBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-              badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-              textColor: 'text-amber-400',
-            },
-            indigo: {
-              activeBorder: 'border-indigo-500 ring-2 ring-indigo-500/30 bg-indigo-950/40',
-              hoverBorder: 'hover:border-indigo-500/60',
-              iconBg: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
-              badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-              textColor: 'text-indigo-400',
-            },
-            rose: {
-              activeBorder: 'border-rose-500 ring-2 ring-rose-500/30 bg-rose-950/40',
-              hoverBorder: 'hover:border-rose-500/60',
-              iconBg: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-              badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
-              textColor: 'text-rose-400',
-            },
-          }[box.colorScheme];
-
           return (
-            <div
+            <button
               key={box.category}
-              id={`duty-heading-box-${box.category.toLowerCase().replace(/\s+/g, '-')}`}
+              type="button"
+              id={`duty-btn-${box.category.toLowerCase().replace(/\s+/g, '-')}`}
               onClick={() => handleBoxClick(box.category)}
-              className={`group relative p-3 sm:p-3.5 rounded-xl border transition-all duration-200 cursor-pointer select-none flex flex-col justify-between ${
+              className={`p-2 sm:py-2 px-3 rounded-lg border text-xs font-mono transition-all cursor-pointer flex items-center justify-between gap-1.5 ${
                 isSelected
-                  ? `${colorClasses.activeBorder} shadow-lg`
-                  : `bg-slate-900/90 border-slate-800 ${colorClasses.hoverBorder} hover:bg-slate-800/80`
+                  ? 'bg-rose-600 text-white border-rose-500 shadow-md font-bold'
+                  : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
               }`}
             >
-              <div>
-                <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black font-mono text-slate-400">
-                      {box.num}
-                    </span>
-                    <h5
-                      className={`text-sm sm:text-base font-black tracking-tight ${
-                        isSelected ? colorClasses.textColor : 'text-white group-hover:text-slate-200'
-                      }`}
-                    >
-                      {box.title}
-                    </h5>
-                  </div>
-                  <div
-                    className={`p-1.5 rounded-lg border text-xs flex items-center justify-center ${colorClasses.iconBg}`}
-                  >
-                    <Icon className="w-4 h-4" />
-                  </div>
-                </div>
-
-                <p className="text-[10px] sm:text-[11px] text-slate-400 line-clamp-1">
-                  {box.subTitle}
-                </p>
+              <div className="flex items-center gap-1.5 truncate">
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-rose-400'}`} />
+                <span className="truncate">{box.num} {box.title}</span>
               </div>
-
-              <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-500 uppercase">Detailed:</span>
-                <span
-                  className={`text-xs font-mono font-black px-2 py-0.5 rounded border ${
-                    count > 0 ? colorClasses.badge : 'bg-slate-800 text-slate-400 border-slate-700'
-                  }`}
-                >
-                  {count > 0 ? `${count} Soldiers` : '0 Soldiers'}
-                </span>
-              </div>
-
-              {isSelected && (
-                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-900 border-r border-b border-slate-700 rotate-45" />
-              )}
-            </div>
+              <span
+                className={`text-xs px-2 py-0.5 rounded font-mono font-bold shrink-0 ${
+                  isSelected
+                    ? 'bg-white/25 text-white'
+                    : count > 0
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
           );
         })}
       </div>
 
-      {/* INTERACTIVE DUTY ASSIGNMENT PANEL (Opens when a box is clicked) */}
-      {activeCategory && activeBoxDef && (
-        <div className="p-3 sm:p-4 rounded-xl bg-slate-900/95 border border-slate-700/90 shadow-2xl space-y-3.5 animate-fadeIn">
-          {/* Active Box Label & Summary */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      {/* 2. ENTRY OPTION & LIST BELOW (APPEARS WHEN A CATEGORY IS CLICKED) */}
+      {activeCategory && activeBoxDef ? (
+        <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 shadow-lg space-y-3 animate-fadeIn">
+          {/* Active Category Header */}
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                ACTIVE: {activeBoxDef.num} {activeBoxDef.title}
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                {activeBoxDef.num} {activeBoxDef.title} Entry
               </span>
-              <span className="text-xs text-slate-300 font-mono">
+              <span className="text-xs font-mono text-slate-400">
                 Assigned: <strong className="text-white font-bold">{activeCategoryAssignments.length}</strong>
               </span>
             </div>
 
-            {activeCategoryAssignments.length > 0 && !isReadOnly && (
+            <div className="flex items-center gap-2">
+              {activeCategoryAssignments.length > 0 && !isReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Clear all ${activeCategory} assignments?`)) {
+                      clearParadeDutyAssignments(date, sessionType, activeCategory);
+                    }
+                  }}
+                  className="text-xs font-mono text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
+                  title="Clear all"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Clear</span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(`Clear all ${activeCategory} assignments for this session?`)) {
-                    clearParadeDutyAssignments(date, sessionType, activeCategory);
-                  }
-                }}
-                className="text-[11px] font-mono text-rose-400 hover:text-rose-300 flex items-center gap-1 hover:underline cursor-pointer"
+                onClick={() => setActiveCategory(null)}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Close Entry"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Clear All ({activeCategory})</span>
+                <X className="w-4 h-4" />
               </button>
-            )}
+            </div>
           </div>
 
-          {/* THE REQUESTED CORE CONTROL ROW: Dropdown Box on Left + Snk No/Name Search on Right */}
+          {/* Entry Form: Dropdown + Snk No/Name Search */}
           {!isReadOnly ? (
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end">
-              {/* 1. DROPDOWN BOX ("ekta drop down box ashbe") */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+              {/* Dropdown */}
               <div className="md:col-span-5 space-y-1">
-                <label className="text-[11px] font-mono font-bold text-slate-300 flex items-center justify-between">
-                  <span>1. Select Duty Role / সাব-ডিউটি:</span>
+                <label className="text-xs font-mono text-slate-400 flex items-center justify-between">
+                  <span>Duty Role:</span>
                   {isCustomDuty && (
                     <button
                       type="button"
                       onClick={() => setIsCustomDuty(false)}
                       className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
                     >
-                      ← Back to list
+                      ← Back
                     </button>
                   )}
                 </label>
@@ -460,42 +398,39 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
                           setSelectedDutyName(e.target.value);
                         }
                       }}
-                      className="w-full bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-rose-500 transition-colors appearance-none cursor-pointer pr-8"
+                      className="w-full bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-rose-500 appearance-none cursor-pointer pr-7"
                     >
                       {activeBoxDef.defaultRoles.map((role) => (
-                        <option key={role} value={role} className="bg-slate-900 text-white py-1">
+                        <option key={role} value={role} className="bg-slate-900 text-white">
                           {role}
                         </option>
                       ))}
-                      <option value="__CUSTOM__" className="bg-slate-900 text-cyan-400 font-bold py-1">
-                        ➕ Custom Duty (কাস্টম নাম লিখুন)...
+                      <option value="__CUSTOM__" className="bg-slate-900 text-cyan-400 font-bold">
+                        + Custom Duty...
                       </option>
                     </select>
-                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 ) : (
                   <input
                     type="text"
                     value={customDutyInput}
                     onChange={(e) => setCustomDutyInput(e.target.value)}
-                    placeholder="Enter Custom Duty name..."
-                    className="w-full bg-slate-950 border border-cyan-500/60 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-cyan-400"
+                    placeholder="Enter custom duty name..."
+                    className="w-full bg-slate-950 border border-cyan-500/60 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-cyan-400"
                     autoFocus
                   />
                 )}
               </div>
 
-              {/* 2. SNK NO / NAME SEARCH BOX ("tar dane snk no/naam search korar box ashbe") */}
+              {/* Soldier Search */}
               <div className="md:col-span-7 space-y-1 relative" ref={dropdownRef}>
-                <label className="text-[11px] font-mono font-bold text-slate-300 flex items-center justify-between">
-                  <span>2. Search Snk No / Name (সৈনিক নং বা নাম সার্চ করুন):</span>
-                  <span className="text-[10px] text-emerald-400 font-mono">
-                    Type to search &amp; hit Enter / Click to Add
-                  </span>
+                <label className="text-xs font-mono text-slate-400">
+                  Search Soldier (Snk No or Name):
                 </label>
 
                 <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -515,8 +450,8 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
                         setIsSearchOpen(false);
                       }
                     }}
-                    placeholder="Search by Snk No (e.g. 144567) or Name..."
-                    className="w-full bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors font-mono"
+                    placeholder="Type Snk No or Name..."
+                    className="w-full bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 font-mono"
                   />
                   {searchQuery && (
                     <button
@@ -525,16 +460,16 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
                         setSearchQuery('');
                         setIsSearchOpen(false);
                       }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
 
-                {/* Instant Search Autocomplete Dropdown */}
+                {/* Autocomplete Dropdown */}
                 {isSearchOpen && searchQuery.trim().length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-50 p-1 divide-y divide-slate-800">
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-700 rounded-lg shadow-2xl max-h-56 overflow-y-auto z-50 p-1 divide-y divide-slate-850">
                     {searchResults.length > 0 ? (
                       searchResults.map((soldier) => {
                         const isAlready = allAssignments.some(
@@ -545,43 +480,35 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
                           <div
                             key={soldier.id}
                             onClick={() => handleAddSoldier(soldier)}
-                            className="p-2.5 hover:bg-slate-900 rounded-lg flex items-center justify-between gap-2 cursor-pointer transition-colors group"
+                            className="p-2 hover:bg-slate-900 rounded-md flex items-center justify-between gap-2 cursor-pointer transition-colors"
                           >
-                            <div className="flex items-center gap-2.5">
-                              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-rose-300 border border-slate-700">
-                                {soldier.armyNo}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs font-mono font-bold px-1.5 py-0.2 rounded bg-slate-800 text-rose-300">
+                                {soldier.snkNo || (soldier as any).armyNo}
                               </span>
-                              <div>
-                                <div className="text-xs font-bold text-white group-hover:text-rose-300">
-                                  {soldier.rank} {soldier.name}
-                                </div>
-                                <div className="text-[10px] font-mono text-slate-400">
-                                  {soldier.battery} • {soldier.trade || 'GD'}
-                                </div>
+                              <div className="truncate">
+                                <span className="text-xs font-bold text-white">
+                                  {soldier.rk || (soldier as any).rank} {soldier.name}
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400 ml-1.5">
+                                  ({soldier.battery})
+                                </span>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5">
-                              {isAlready ? (
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                  Already in {activeCategory}
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1 shadow"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  <span>Add</span>
-                                </button>
-                              )}
-                            </div>
+                            <button
+                              type="button"
+                              className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1 shrink-0"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>{isAlready ? 'Update' : 'Add'}</span>
+                            </button>
                           </div>
                         );
                       })
                     ) : (
-                      <div className="p-3 text-center text-xs text-slate-400 font-mono">
-                        No soldiers found matching "{searchQuery}"
+                      <div className="p-2.5 text-center text-xs text-slate-400 font-mono">
+                        No soldier found matching "{searchQuery}"
                       </div>
                     )}
                   </div>
@@ -589,76 +516,80 @@ export const ParadeDutyHeadingBoxes: React.FC<ParadeDutyHeadingBoxesProps> = ({
               </div>
             </div>
           ) : (
-            <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 font-mono">
-              View-Only Mode: Only BSM, RSM, or Admin can detail soldiers to duty.
+            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 font-mono">
+              View-Only Mode
             </div>
           )}
 
-          {/* LIST OF ADDED SOLDIERS IN THIS CATEGORY ("tar naam add and evabe aro add kora jaabe") */}
-          <div className="pt-2 border-t border-slate-800">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono font-bold text-slate-400">
-                Detailed Soldiers in {activeCategory} ({activeCategoryAssignments.length}):
-              </span>
-              <span className="text-[11px] font-mono text-slate-500">
-                Sorted by assignment
+          {/* 3. LIST OF ASSIGNED SOLDIERS BELOW (CLEAN MINIMALIZED WHITE BG DESIGN) */}
+          <div className="pt-2 border-t border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-slate-300">
+                Assigned Personnel List ({activeCategoryAssignments.length}):
               </span>
             </div>
 
-            {activeCategoryAssignments.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {activeCategoryAssignments.map((assigned, idx) => (
-                  <div
-                    key={assigned.id}
-                    className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/90 hover:border-slate-700 flex items-center justify-between gap-2 shadow-sm transition-all"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[10px] font-mono font-bold text-slate-500 shrink-0">
-                        #{idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-                          <span>{assigned.rank} {assigned.name}</span>
-                          <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-1.5 rounded border border-cyan-800/60">
-                            {assigned.snkNo}
-                          </span>
-                        </div>
-                        <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 mt-0.5 truncate">
-                          <span className="text-slate-300">{assigned.battery}</span>
-                          <span>•</span>
-                          <span className="text-emerald-400 font-bold truncate">
-                            {assigned.dutyName}
-                          </span>
-                        </div>
+            {groupedSubCategories.length > 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden text-slate-900">
+                {groupedSubCategories.map((group, gIdx) => (
+                  <div key={group.dutyName} className={gIdx > 0 ? 'border-t border-slate-200' : ''}>
+                    {/* Sub-category header */}
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-slate-100/90 border-b border-slate-200 text-xs font-mono">
+                      <div className="flex items-center gap-2 font-bold text-slate-800">
+                        <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />
+                        <span>{group.dutyName}</span>
                       </div>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-300">
+                        {group.personnel.length}
+                      </span>
                     </div>
 
-                    {!isReadOnly && (
-                      <button
-                        type="button"
-                        onClick={() => removeParadeDutyAssignment(assigned.id, date, sessionType)}
-                        className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
-                        title="Remove soldier from this duty"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    {/* Personnel List (Clean white tabular list) */}
+                    <div className="divide-y divide-slate-100">
+                      {group.personnel.map((assigned, idx) => (
+                        <div
+                          key={assigned.id}
+                          className="px-3 py-1.5 flex items-center justify-between gap-2 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <span className="text-[11px] font-mono font-medium text-slate-400 w-5 shrink-0">
+                              {idx + 1}.
+                            </span>
+                            <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-900 border border-slate-300 shrink-0">
+                              {assigned.snkNo}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-900 truncate">
+                              {assigned.rank} {assigned.name}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-500 shrink-0">
+                              ({assigned.battery})
+                            </span>
+                          </div>
+
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              onClick={() => removeParadeDutyAssignment(assigned.id, date, sessionType)}
+                              className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
+                              title="Remove"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 text-center">
-                <p className="text-xs text-slate-400 font-mono">
-                  No soldiers assigned to <strong>{activeCategory}</strong> yet for {sessionType}.
-                </p>
-                <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                  Select a duty role above, type soldier's Snk No (Army No) or Name in the search box, and click Add.
-                </p>
+              <div className="p-4 rounded-xl bg-white border border-slate-200 text-center text-xs text-slate-500 font-mono">
+                No personnel assigned yet to {activeCategory}.
               </div>
             )}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

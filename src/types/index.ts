@@ -232,11 +232,22 @@ export type ParadeSessionType = 'Morning' | 'Second Period' | 'Games' | 'Roll Ca
 
 export type ParadeRecordStatus =
   | 'Draft'
+  | 'Saved'
   | 'Submitted'
   | 'Pending RSM Confirmation'
   | 'Edited by RSM'
   | 'Confirmed'
-  | 'Finalized';
+  | 'Finalized'
+  | 'Sent to Adjt';
+
+export interface DutySessionStatus {
+  status: 'Draft' | 'Saved' | 'Sent to Adjt';
+  savedAt?: string;
+  savedBy?: string;
+  sentToAdjtAt?: string;
+  sentToAdjtBy?: string;
+  notes?: string;
+}
 
 export interface ParadeTypeDefinition {
   id: string;

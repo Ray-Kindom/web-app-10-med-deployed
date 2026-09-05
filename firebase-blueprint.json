@@ -186,6 +186,42 @@
         "unitName": { "type": "string" },
         "motto": { "type": "string" }
       }
+    },
+    "ParadeType": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "order": { "type": "number" },
+        "createdBy": { "type": "string" },
+        "headings": { "type": "array", "items": { "type": "string" } },
+        "isDeleted": { "type": "boolean" }
+      },
+      "required": ["id", "name", "order"]
+    },
+    "ParadeRecord": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "typeId": { "type": "string" },
+        "battery": { "type": "string" },
+        "status": { "type": "string" },
+        "strengthSummary": { "type": "object" },
+        "confirmedBy": { "type": "string" },
+        "confirmedAt": { "type": "string" }
+      },
+      "required": ["id", "date", "typeId", "battery", "status"]
+    },
+    "ParadeDutyAssignment": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "sessionType": { "type": "string" },
+        "assignments": { "type": "array" }
+      },
+      "required": ["date", "sessionType", "assignments"]
     }
   },
   "firestore": {
@@ -217,6 +253,14 @@
       "schema": "CalculationConfig",
       "description": "Configurable calculation rules for Total Out, Off Parade, and On Parade"
     },
+    "/parade_types/{typeId}": {
+      "schema": "ParadeType",
+      "description": "Parade states, schedules, and custom periods"
+    },
+    "/parade_records/{recordId}": {
+      "schema": "ParadeRecord",
+      "description": "Daily roll call and battery parade state records"
+    },
     "/personnel/{personnelId}": {
       "schema": "Personnel",
       "description": "Regiment soldier master records with strength and parade status"
@@ -224,6 +268,10 @@
     "/parade_points/{pointId}": {
       "schema": "DailyParadePoint",
       "description": "Daily parade line points and battery strength counts"
+    },
+    "/parade_duty_assignments/{assignmentId}": {
+      "schema": "ParadeDutyAssignment",
+      "description": "Daily parade duty assignments by category and session"
     },
     "/duty_roster/{dutyId}": {
       "schema": "DutyAssignment",
