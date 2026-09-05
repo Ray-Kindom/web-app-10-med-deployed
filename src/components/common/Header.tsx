@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { UnitLogo } from './UnitLogo';
 import { Role, Battery } from '../../types';
+import { CloudSyncModal } from './CloudSyncModal';
 import {
   ShieldAlert,
   Clock,
@@ -33,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
     notification,
     firebaseUser,
     isFirebaseReady,
+    cloudPermissionDenied,
     logout,
     isRealAdmin,
     isGuest,
@@ -43,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [militaryTime, setMilitaryTime] = useState<string>('');
   const [roleDropdownOpen, setRoleDropdownOpen] = useState<boolean>(false);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  const [isCloudModalOpen, setIsCloudModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -304,16 +307,29 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Firebase Cloud Sync Indicator */}
-            <div
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs font-mono"
-              title={firebaseUser ? "Real-time Firebase Cloud Synchronized" : "Local Fast-Storage Ready"}
+            {/* Firebase Cloud Sync Interactive Button */}
+            <button
+              type="button"
+              onClick={() => setIsCloudModalOpen(true)}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono transition-all cursor-pointer shadow-sm group border ${
+                !cloudPermissionDenied
+                  ? 'bg-emerald-950/40 hover:bg-emerald-900/50 border-emerald-500/40 text-emerald-300'
+                  : 'bg-amber-950/40 hover:bg-amber-900/50 border-amber-500/40 text-amber-300'
+              }`}
+              title={
+                !cloudPermissionDenied
+                  ? "Real-time Cloud Auto-Sync Active (ID/Password Mode) • Click for details"
+                  : "Cloud Rules Setup Needed • Click to view instructions"
+              }
             >
-              <Cloud className={`w-3.5 h-3.5 ${firebaseUser ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
-              <span className={`text-[11px] font-bold ${firebaseUser ? 'text-emerald-400' : 'text-slate-300'}`}>
-                {firebaseUser ? 'Cloud Live' : 'Local Ready'}
+              <Cloud className={`w-3.5 h-3.5 transition-transform group-hover:scale-110 ${!cloudPermissionDenied ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
+              <span className={`text-[11px] font-bold ${!cloudPermissionDenied ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {!cloudPermissionDenied ? 'Cloud Live' : 'Rules Setup'}
               </span>
-            </div>
+              <span className="text-[9px] text-slate-400 font-sans hidden lg:inline">
+                {!cloudPermissionDenied ? '(Auto-Sync)' : '(Needed)'}
+              </span>
+            </button>
 
             {/* Profile Pill with User Photo & Name Initials */}
             <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
@@ -356,6 +372,12 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Cloud Auto-Sync Modal */}
+      <CloudSyncModal
+        isOpen={isCloudModalOpen}
+        onClose={() => setIsCloudModalOpen(false)}
+      />
     </header>
   );
 };

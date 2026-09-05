@@ -16,11 +16,17 @@ import {
   Cloud,
   UserCheck,
   Sparkles,
+  ShieldAlert,
+  Copy,
+  Check,
+  ExternalLink,
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { usersList, loginWithCredentials, loginWithGoogle } = useApp();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
   const [password, setPassword] = useState('');
@@ -301,8 +307,21 @@ export const LoginPage: React.FC = () => {
             type="button"
             onClick={async () => {
               setIsGoogleLoading(true);
+              setErrorMessage(null);
               try {
-                await loginWithGoogle();
+                const res = await loginWithGoogle();
+                if (!res.success && res.code === 'auth/unauthorized-domain') {
+                  const domain = res.domain || (typeof window !== 'undefined' ? window.location.hostname : '');
+                  setUnauthorizedDomain(domain);
+                } else if (!res.success && res.code !== 'auth/popup-closed-by-user') {
+                  setErrorMessage(res.error || 'গুগল লগইন সম্পন্ন করা সম্ভব হয়নি।');
+                }
+              } catch (e: any) {
+                if (e?.code === 'auth/unauthorized-domain') {
+                  setUnauthorizedDomain(typeof window !== 'undefined' ? window.location.hostname : '');
+                } else if (e?.code !== 'auth/popup-closed-by-user') {
+                  setErrorMessage(e?.message || 'গুগল লগইন সম্পন্ন করা সম্ভব হয়নি।');
+                }
               } finally {
                 setIsGoogleLoading(false);
               }
@@ -321,6 +340,103 @@ export const LoginPage: React.FC = () => {
           <span>CONFIDENTIAL • 10 MED REGT ARTY MILITARY USE ONLY</span>
         </div>
       </div>
+
+      {/* Domain Authorization Helper Modal */}
+      {unauthorizedDomain && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-amber-500/50 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <button
+              type="button"
+              onClick={() => setUnauthorizedDomain(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 shrink-0">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base sm:text-lg font-bold text-white">
+                  Firebase Domain Authorization Required
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  গুগল ফায়ারবেস সিকিউরিটির কারণে বর্তমান ক্লাউড প্রিভিউ ডোমেইনটি Firebase Console-এর Authorized Domains তালিকায় যুক্ত থাকতে হয়।
+                </p>
+              </div>
+            </div>
+
+            {/* Quick 1-Click Bypass to Admin */}
+            <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/40 rounded-xl p-4 space-y-2">
+              <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold font-mono">
+                <Sparkles className="w-4 h-4" />
+                <span>তাত্ক্ষণিক অ্যাডমিন অ্যাক্সেস (Recommended)</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                ডোমেইন কনফিগারেশন ছাড়াই সরাসরি ফুল অ্যাডমিন হিসেবে প্রবেশ করতে নিচের বাটনে চাপুন:
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setUnauthorizedDomain(null);
+                  const result = loginWithCredentials('admin', 'admin123');
+                  if (!result.success) {
+                    setErrorMessage(result.error || 'অ্যাডমিন লগইন করতে সমস্যা হয়েছে।');
+                  }
+                }}
+                className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-900/30"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Continue as Regimental Admin (One-Click)</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Step-by-step Whitelist Instructions */}
+            <div className="space-y-2.5 pt-1">
+              <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span>বর্তমান ডোমেইন (Current Host):</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(unauthorizedDomain);
+                    setCopiedDomain(true);
+                    setTimeout(() => setCopiedDomain(false), 2500);
+                  }}
+                  className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-mono transition-colors"
+                >
+                  {copiedDomain ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedDomain ? 'Copied to Clipboard!' : 'Copy Domain'}</span>
+                </button>
+              </div>
+
+              <div className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 font-mono text-xs text-amber-300 break-all select-all flex items-center justify-between">
+                <span>{unauthorizedDomain}</span>
+              </div>
+
+              <div className="text-[11px] text-slate-400 space-y-1.5 pt-1 font-sans bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                <p className="font-semibold text-slate-300">Firebase Console-এ ডোমেইন যুক্ত করার নিয়ম:</p>
+                <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                  <li>Firebase Console (<a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-rose-400 underline inline-flex items-center gap-0.5">console.firebase.google.com <ExternalLink className="w-2.5 h-2.5 inline" /></a>) ওপেন করুন।</li>
+                  <li>প্রজেক্ট <strong>gen-lang-client-0581671896</strong> বেছে নিয়ে <strong>Authentication</strong> → <strong>Settings</strong> ট্যাবে যান।</li>
+                  <li><strong>Authorized domains</strong> সেকশনে <strong>Add domain</strong>-এ ক্লিক করে উপরের ডোমেইনটি পেস্ট করে সেভ করুন।</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setUnauthorizedDomain(null)}
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+              >
+                বন্ধ করুন (Close)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Password Modal when a user card is clicked */}
       {selectedUser && (

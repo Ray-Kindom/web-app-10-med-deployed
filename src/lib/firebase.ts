@@ -92,8 +92,16 @@ export const signInWithGoogle = async (): Promise<FirebaseUser> => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
-  } catch (error) {
-    console.error('[Firebase Auth] Google sign-in failed:', error);
+  } catch (error: any) {
+    if (error?.code === 'auth/unauthorized-domain') {
+      console.warn(
+        `[Firebase Auth] Domain '${typeof window !== 'undefined' ? window.location.hostname : ''}' is not authorized in Firebase Console. Add it to Firebase Console -> Authentication -> Settings -> Authorized domains.`
+      );
+    } else if (error?.code === 'auth/popup-closed-by-user') {
+      console.info('[Firebase Auth] Sign-in popup was closed by user.');
+    } else {
+      console.error('[Firebase Auth] Google sign-in failed:', error);
+    }
     throw error;
   }
 };

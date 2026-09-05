@@ -2,136 +2,75 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    // Role-based helper from stored user profile (guarded with exists() check)
-    function getUserRole() {
-      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-        : '';
-    }
-
-    // Strict ADMIN check (Admin permissions > RSM permissions)
-    // Explicitly authorizes application owner backupray12145@gmail.com, bootstrapped admin accounts, and users with Admin role
-    function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.email in ['10medclk@gmail.com', 'mdraiyan1512@gmail.com', 'backupray12145@gmail.com', '10medcanteen@gmail.com', 'mdray12145@gmail.com'] ||
-        getUserRole() == 'Admin' ||
-        request.auth.token.email != null
-      );
-    }
-
-    // RSM operational control
-    function isRSM() {
-      return isAuthenticated() && (getUserRole() == 'RSM' || isAdmin());
-    }
-
-    function isBSM() {
-      return isAuthenticated() && (
-        getUserRole() in ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'] ||
-        isAdmin()
-      );
-    }
-
-    function isCommandStaff() {
-      return isAuthenticated() && (
-        isAdmin() ||
-        isRSM() ||
-        getUserRole() in ['CO', 'Offr', '2IC', 'Officer']
-      );
-    }
-
+    // Operational Collections for 10 Medium Regiment Artillery App
     // 1. /users/{userId} - User accounts and roles
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if isAuthenticated();
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // 2. /system_categories/{catId} - Dynamic Categories & Sub-categories
     match /system_categories/{catId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 3. /sub_units/{unitId} - Sub-units / Batteries
     match /sub_units/{unitId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 4. /military_ranks/{rankId} - Military Ranks
     match /military_ranks/{rankId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 4b. /military_trades/{tradeId} - Military Trades & Specializations
     match /military_trades/{tradeId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 5. /auth_establishment/{estId} - Auth Establishment
     match /auth_establishment/{estId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 6. /calculation_config/{cfgId} - Calculation Rules Config
     match /calculation_config/{cfgId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 7. /parade_types/{typeId} - Parade States (Admin & RSM managed)
     match /parade_types/{typeId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 8. /parade_records/{recordId} - Daily Roll Call & Parade State Records
     match /parade_records/{recordId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 9. /personnel/{personnelId} - Nominal Roll & Personnel Records
     match /personnel/{personnelId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 10. /parade_points/{pointId} - Daily Parade Points & Counts
     match /parade_points/{pointId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 11. /duty_roster/{dutyId} - Duty Roster Assignments
     match /duty_roster/{dutyId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 12. /audit_logs/{logId} - Security Audit Trail
     match /audit_logs/{logId} {
-      allow read: if true;
-      allow create, update: if true;
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // 13. /settings/{settingId} - Regiment Settings and Battery Statuses
     match /settings/{settingId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 14. /test/{testId} - Connectivity Healthcheck
@@ -141,8 +80,12 @@ service cloud.firestore {
 
     // 15. /parade_duty_assignments/{assignmentId} - Daily Parade Duty Assignments & Details
     match /parade_duty_assignments/{assignmentId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
+    }
+
+    // Catch-all for any other regiment data collections
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

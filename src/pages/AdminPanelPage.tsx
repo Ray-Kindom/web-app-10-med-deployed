@@ -35,6 +35,7 @@ import {
   CalendarDays,
   Calculator,
   Award,
+  Cloud,
 } from 'lucide-react';
 
 export const AdminPanelPage: React.FC = () => {
@@ -50,6 +51,9 @@ export const AdminPanelPage: React.FC = () => {
     customLogo,
     setCustomLogo,
     syncNominalRollToCloud,
+    syncAllToCloud,
+    firebaseUser,
+    loginWithGoogle,
     isRealAdmin,
     isSimulating,
     exitSimulation,
@@ -804,21 +808,70 @@ export const AdminPanelPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
-            <div className="space-y-1">
-              <h4 className="font-bold text-white text-sm">Force Sync Official Nominal Roll (606 Personnel) to Cloud</h4>
-              <p className="text-xs text-slate-400">
-                Pushes all 606 regiment personnel (Cutting List, ERE, Permanent Attached, and UN Mission) directly to Google Firebase Cloud Firestore.
-              </p>
+          {/* Cloud Connection & Auto Sync Center */}
+          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3 mt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                    firebaseUser
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  }`}>
+                    {firebaseUser ? 'LIVE CLOUD AUTO-SYNC: ON' : 'LOCAL MODE: AUTO-SYNC OFF'}
+                  </span>
+                  {firebaseUser && (
+                    <span className="text-[11px] font-mono text-slate-300">
+                      Connected: <strong className="text-white">{firebaseUser.email}</strong>
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-bold text-white text-sm">
+                  {firebaseUser ? 'Real-Time Cloud Synchronization Active' : 'Connect to Firebase to Enable Real-Time Server Sync'}
+                </h4>
+                <p className="text-xs text-slate-400">
+                  {firebaseUser
+                    ? 'All edits to users, nominal roll, and parade states are automatically saved to Firebase Cloud Firestore.'
+                    : 'Connect your Google account to automatically push and sync all edits directly to the Google Cloud server.'}
+                </p>
+              </div>
+
+              {!firebaseUser && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await loginWithGoogle();
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-emerald-950/50"
+                >
+                  <Cloud className="w-4 h-4" />
+                  <span>Connect Google Cloud</span>
+                </button>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => syncNominalRollToCloud()}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-emerald-950/50"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Sync 606 Personnel Now</span>
-            </button>
+
+            <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="space-y-0.5 text-left w-full sm:w-auto">
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Push All Current Data to Firebase Cloud</span>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Uploads all users, sub-units, ranks, calculation rules, parade states, and the 606 personnel.
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => syncAllToCloud()}
+                  className="px-4 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shadow-lg bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Sync Entire Regiment to Cloud</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

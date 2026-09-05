@@ -731,14 +731,14 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             <button
               type="submit"
               disabled={!!duplicateUser}
-              className={`flex items-center gap-2 px-5 py-2 rounded-xl text-white text-xs font-bold shadow-lg transition-colors cursor-pointer ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-xs font-bold shadow-lg transition-colors cursor-pointer ${
                 duplicateUser
                   ? 'bg-slate-700 opacity-60 cursor-not-allowed'
                   : 'bg-rose-600 hover:bg-rose-500 shadow-rose-900/40'
               }`}
             >
               <Check className="w-4 h-4" />
-              <span>{editUser ? 'Update User Account' : 'Create User Account'}</span>
+              <span>{editUser ? 'Save User (Update Account)' : 'Save User (Create Account)'}</span>
             </button>
           </div>
         </form>

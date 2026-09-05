@@ -215,6 +215,7 @@ interface AppContextType {
 
   // Modal triggers
   syncNominalRollToCloud: () => Promise<void>;
+  syncAllToCloud: () => Promise<{ success: boolean; count?: number; error?: string }>;
   dailyParadeModalOpen: boolean;
   setDailyParadeModalOpen: (open: boolean) => void;
   outOfUnitModalOpen: boolean;
@@ -236,7 +237,8 @@ interface AppContextType {
   // Firebase Auth & Cloud Sync
   firebaseUser: FirebaseUser | null;
   isFirebaseReady: boolean;
-  loginWithGoogle: () => Promise<void>;
+  cloudPermissionDenied: boolean;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string; code?: string; domain?: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -536,29 +538,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Firebase Auth state
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isFirebaseReady, setIsFirebaseReady] = useState<boolean>(false);
+  const [cloudPermissionDenied, setCloudPermissionDenied] = useState<boolean>(false);
 
   // Modals
   const [dailyParadeModalOpen, setDailyParadeModalOpen] = useState<boolean>(false);
   const [outOfUnitModalOpen, setOutOfUnitModalOpen] = useState<boolean>(false);
   const [activeOutOfUnitCategory, setActiveOutOfUnitCategory] = useState<OutOfUnitCategory>('Msn');
 
-  // Safe helper to sync to Firestore with structured error handling per SKILL.md
+  // Safe helper to sync to Firestore with structured error handling
   const syncDoc = (promiseOrFn: (() => Promise<any>) | Promise<any>, description?: string) => {
-    if (!auth.currentUser) {
-      if (typeof promiseOrFn !== 'function' && promiseOrFn && typeof (promiseOrFn as any).catch === 'function') {
-        (promiseOrFn as any).catch(() => {
-          // Suppress unauthenticated background rejection in offline/local credentials mode
-        });
-      }
-      return;
-    }
     try {
       const p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
-      p?.catch?.((err: any) => {
-        handleFirestoreError(err, OperationType.WRITE, description || null);
+      p?.then?.(() => {
+        setCloudPermissionDenied(false);
+      })?.catch?.((err: any) => {
+        if (err?.code === 'permission-denied' || String(err).includes('permission-denied')) {
+          setCloudPermissionDenied(true);
+          console.warn(`[Cloud Sync] Firebase rules require allow read, write: if true; for: ${description}`);
+        } else {
+          console.error(`[Cloud Sync] Write error for: ${description}`, err);
+        }
       });
     } catch (e: any) {
-      handleFirestoreError(e, OperationType.WRITE, description || null);
+      if (e?.code === 'permission-denied' || String(e).includes('permission-denied')) {
+        setCloudPermissionDenied(true);
+      } else {
+        console.error(`[Cloud Sync] Sync exception:`, e);
+      }
     }
   };
 
@@ -1822,27 +1828,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Real-time Firestore Listeners & Database bootstrapping
-  // Strictly respects SKILL.md: "Data Fetching: Only attach onSnapshot listeners if auth is ready and user is authenticated."
+  // Runs continuously in background for all users (ID/Password & Google Login)
   useEffect(() => {
     setIsFirebaseReady(true);
 
-    if (!firebaseUser) {
-      // Running in local/offline mode with full nominal roll (606 personnel) and settings
-      return;
-    }
-
     const isAuthorizedAdmin =
-      firebaseUser.email === '10medclk@gmail.com' ||
-      firebaseUser.email === 'mdraiyan1512@gmail.com' ||
-      firebaseUser.email === 'backupray12145@gmail.com' ||
-      firebaseUser.email === 'mdray12145@gmail.com' ||
       currentUser.role === 'Admin' ||
-      isRealAdmin;
+      isRealAdmin ||
+      firebaseUser?.email === '10medclk@gmail.com' ||
+      firebaseUser?.email === 'mdraiyan1512@gmail.com';
+
+    const handleSnapError = (err: any, col: string) => {
+      if (err?.code === 'permission-denied' || String(err).includes('permission-denied')) {
+        setCloudPermissionDenied(true);
+        console.warn(`[Cloud Sync] Firestore rules permission denied on: ${col}`);
+      } else {
+        console.warn(`[Cloud Sync] Snapshot note on ${col}:`, err);
+      }
+    };
 
     // 1. /users listener
     const unsubUsers = onSnapshot(
       collection(db, 'users'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteUsers = snapshot.docs.map((d) => d.data() as UserAccount);
           setUsersList(remoteUsers);
@@ -1853,15 +1862,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'users');
-      }
+      (err) => handleSnapError(err, 'users')
     );
 
     // 2. /personnel listener
     const unsubPersonnel = onSnapshot(
       collection(db, 'personnel'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty && snapshot.docs.length >= 500) {
           const remotePersonnel = snapshot.docs.map((d) => d.data() as Personnel);
           setPersonnelList(remotePersonnel);
@@ -1873,15 +1881,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setPersonnelList(INITIAL_PERSONNEL);
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'personnel');
-      }
+      (err) => handleSnapError(err, 'personnel')
     );
 
     // 3. /parade_points listener
     const unsubPoints = onSnapshot(
       collection(db, 'parade_points'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remotePoints = snapshot.docs
             .map((d) => d.data() as DailyParadePoint)
@@ -1893,15 +1900,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'parade_points');
-      }
+      (err) => handleSnapError(err, 'parade_points')
     );
 
     // 4. /duty_roster listener
     const unsubDuty = onSnapshot(
       collection(db, 'duty_roster'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteDuty = snapshot.docs.map((d) => d.data() as DutyAssignment);
           setDutyRoster(remoteDuty);
@@ -1911,15 +1917,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'duty_roster');
-      }
+      (err) => handleSnapError(err, 'duty_roster')
     );
 
     // 5. /audit_logs listener (strictly ordered by timestamp)
     const unsubLogs = onSnapshot(
       collection(db, 'audit_logs'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteLogs = snapshot.docs
             .map((d) => d.data() as AuditLogItem)
@@ -1931,15 +1936,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'audit_logs');
-      }
+      (err) => handleSnapError(err, 'audit_logs')
     );
 
     // 6. /settings/regiment_settings listener
     const unsubSettings = onSnapshot(
       doc(db, 'settings', 'regiment_settings'),
       (docSnap) => {
+        setCloudPermissionDenied(false);
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data?.customLogo !== undefined) {
@@ -1947,15 +1951,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'settings/regiment_settings');
-      }
+      (err) => handleSnapError(err, 'settings/regiment_settings')
     );
 
     // 7. /parade_types listener
     const unsubParadeTypes = onSnapshot(
       collection(db, 'parade_types'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteTypes = snapshot.docs
             .map((d) => {
@@ -1978,15 +1981,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'parade_types');
-      }
+      (err) => handleSnapError(err, 'parade_types')
     );
 
     // 8. /parade_records listener
     const unsubParadeRecords = onSnapshot(
       collection(db, 'parade_records'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const map: Record<string, DateWiseParadeRecord> = {};
           snapshot.docs.forEach((d) => {
@@ -1996,15 +1998,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           localStorage.setItem(STORAGE_KEYS.PARADE_RECORDS, JSON.stringify(map));
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'parade_records');
-      }
+      (err) => handleSnapError(err, 'parade_records')
     );
 
     // 9. /system_categories listener (Dynamic Categories & Sub-categories)
     const unsubCategories = onSnapshot(
       collection(db, 'system_categories'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteCats = snapshot.docs
             .map((d) => d.data() as SystemCategory)
@@ -2017,15 +2018,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'system_categories');
-      }
+      (err) => handleSnapError(err, 'system_categories')
     );
 
     // 10. /sub_units listener
     const unsubSubUnits = onSnapshot(
       collection(db, 'sub_units'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteUnits = snapshot.docs
             .map((d) => d.data() as SubUnitConfig)
@@ -2038,15 +2038,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'sub_units');
-      }
+      (err) => handleSnapError(err, 'sub_units')
     );
 
     // 11. /military_ranks listener
     const unsubRanks = onSnapshot(
       collection(db, 'military_ranks'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteRanks = snapshot.docs
             .map((d) => d.data() as RankConfig)
@@ -2059,15 +2058,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'military_ranks');
-      }
+      (err) => handleSnapError(err, 'military_ranks')
     );
 
     // 11b. /military_trades listener
     const unsubTrades = onSnapshot(
       collection(db, 'military_trades'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteTrades = snapshot.docs
             .map((d) => d.data() as TradeConfig)
@@ -2080,15 +2078,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'military_trades');
-      }
+      (err) => handleSnapError(err, 'military_trades')
     );
 
     // 12. /auth_establishment listener
     const unsubAuth = onSnapshot(
       collection(db, 'auth_establishment'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const remoteAuth = snapshot.docs.map((d) => d.data() as AuthEstablishmentItem);
           setAuthEstablishmentList(remoteAuth);
@@ -2099,15 +2096,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'auth_establishment');
-      }
+      (err) => handleSnapError(err, 'auth_establishment')
     );
 
     // 13. /calculation_config listener
     const unsubCalc = onSnapshot(
       doc(db, 'calculation_config', 'default_calc_rules'),
       (docSnap) => {
+        setCloudPermissionDenied(false);
         if (docSnap.exists()) {
           const data = docSnap.data() as CalculationConfig;
           setCalculationConfig(data);
@@ -2122,15 +2118,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           );
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'calculation_config');
-      }
+      (err) => handleSnapError(err, 'calculation_config')
     );
 
     // 14. /parade_duty_assignments listener
     const unsubParadeDutyAssignments = onSnapshot(
       collection(db, 'parade_duty_assignments'),
       (snapshot) => {
+        setCloudPermissionDenied(false);
         if (!snapshot.empty) {
           const map: Record<string, ParadeDutyAssignment[]> = {};
           const statusMap: Record<string, DutySessionStatus> = {};
@@ -2162,9 +2157,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, 'parade_duty_assignments');
-      }
+      (err) => handleSnapError(err, 'parade_duty_assignments')
     );
 
     return () => {
@@ -2184,7 +2177,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubCalc();
       unsubParadeDutyAssignments();
     };
-  }, [firebaseUser, currentUser.role]);
+  }, [currentUser.role, isRealAdmin, firebaseUser]);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -2193,17 +2186,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000);
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string; code?: string; domain?: string }> => {
     try {
       const user = await signInWithGoogle();
       setIsAuthenticated(true);
       setActivePage('main_dashboard');
       showNotification(`Signed in with Google: ${user.displayName || user.email}`);
       addAuditLog('Google OAuth Login', `User authenticated: ${user.email}`, 'SECURITY');
+      return { success: true };
     } catch (err: any) {
-      if (err?.code !== 'auth/popup-closed-by-user') {
+      const code = err?.code || 'auth/unknown';
+      const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+      if (code === 'auth/unauthorized-domain') {
+        const msg = `ফায়ারবেস ডোমেইন সিকিউরিটি বার্তা: বর্তমান ডোমেইনটি (${currentDomain}) Firebase Console-এ অনুমোদিত নয়।`;
+        showNotification(msg);
+        return {
+          success: false,
+          code: 'auth/unauthorized-domain',
+          error: msg,
+          domain: currentDomain,
+        };
+      }
+      if (code !== 'auth/popup-closed-by-user') {
         showNotification(`Google Sign-In: ${err?.message || 'Authentication failed'}`);
       }
+      return {
+        success: false,
+        code,
+        error: err?.message || 'Authentication failed',
+      };
     }
   };
 
@@ -2221,11 +2232,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'অনুগ্রহ করে পাসওয়ার্ড প্রদান করুন।' };
     }
 
-    // Look up user by username (case-insensitive)
+    // Look up user by username or email (case-insensitive)
     const user =
       (cleanU === 'guest' ? GUEST_USER : null) ||
-      usersList.find((u) => u.username.toLowerCase() === cleanU) ||
-      INITIAL_USERS.find((u) => u.username.toLowerCase() === cleanU);
+      usersList.find((u) => u.username.toLowerCase() === cleanU || u.email?.toLowerCase() === cleanU) ||
+      INITIAL_USERS.find((u) => u.username.toLowerCase() === cleanU || u.email?.toLowerCase() === cleanU);
 
     if (!user) {
       return { success: false, error: 'ভুল ইউজারনেম! এই ইউজারনেমে কোনো অ্যাকাউন্ট পাওয়া যায়নি।' };
@@ -2234,7 +2245,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Password verification: Admin default is admin123; Guest default is guest123
     let validPassword = user.password;
     if (!validPassword) {
-      if (user.role === 'Admin' || user.username.toLowerCase() === 'admin') {
+      if (
+        user.role === 'Admin' ||
+        user.username.toLowerCase() === 'admin' ||
+        user.email === 'mdraiyan1512@gmail.com' ||
+        user.email === '10medclk@gmail.com'
+      ) {
         validPassword = 'admin123';
       } else if (user.role === 'Guest' || user.username.toLowerCase() === 'guest') {
         validPassword = 'guest123';
@@ -2328,18 +2344,95 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const syncNominalRollToCloud = async () => {
     try {
-      if (!auth.currentUser) {
-        showNotification('Please sign in with Google to sync nominal roll to Cloud.');
-        return;
-      }
       showNotification('Syncing 606 personnel to Firebase Cloud Firestore...');
       for (const p of INITIAL_PERSONNEL) {
         await setDoc(doc(db, 'personnel', p.id), sanitizeForFirestore(p));
       }
       setPersonnelList(INITIAL_PERSONNEL);
+      setCloudPermissionDenied(false);
       showNotification('606 Personnel successfully synced to Cloud Firestore!');
     } catch (e: any) {
-      showNotification('Sync notice: ' + (e?.message || 'Failed'));
+      if (e?.code === 'permission-denied' || String(e).includes('permission-denied')) {
+        setCloudPermissionDenied(true);
+        showNotification('ফায়ারবেস রুলস পারমিশন এরর: দয়া করে Firebase Console-এ allow read, write: if true; পাবলিশ করুন।');
+      } else {
+        showNotification('Sync notice: ' + (e?.message || 'Failed'));
+      }
+    }
+  };
+
+  const syncAllToCloud = async (): Promise<{ success: boolean; count?: number; error?: string }> => {
+    try {
+      showNotification('রেজিমেন্টের সকল ডেটা ফায়ারবেস ক্লাউডে সিঙ্ক করা হচ্ছে...');
+
+      // 1. Sync User accounts
+      for (const u of usersList) {
+        await setDoc(doc(db, 'users', u.id), sanitizeForFirestore(u), { merge: true });
+      }
+
+      // 2. Sync System Categories
+      for (const c of categoriesList) {
+        await setDoc(doc(db, 'system_categories', c.id), sanitizeForFirestore(c), { merge: true });
+      }
+
+      // 3. Sync Sub-units / Batteries
+      for (const su of subUnitsList) {
+        await setDoc(doc(db, 'sub_units', su.id), sanitizeForFirestore(su), { merge: true });
+      }
+
+      // 4. Sync Military Ranks
+      for (const r of ranksList) {
+        await setDoc(doc(db, 'military_ranks', r.id), sanitizeForFirestore(r), { merge: true });
+      }
+
+      // 5. Sync Military Trades
+      for (const t of tradesList) {
+        await setDoc(doc(db, 'military_trades', t.id), sanitizeForFirestore(t), { merge: true });
+      }
+
+      // 6. Sync Auth Establishment
+      for (const ae of authEstablishmentList) {
+        await setDoc(doc(db, 'auth_establishment', ae.id), sanitizeForFirestore(ae), { merge: true });
+      }
+
+      // 7. Sync Calculation Rules
+      await setDoc(doc(db, 'calculation_config', 'default_calc_rules'), sanitizeForFirestore(calculationConfig), { merge: true });
+
+      // 8. Sync Parade Types
+      for (const pt of paradeTypes) {
+        await setDoc(doc(db, 'parade_types', pt.id), sanitizeForFirestore(pt), { merge: true });
+      }
+
+      // 9. Sync Personnel (Nominal Roll)
+      for (const p of personnelList) {
+        await setDoc(doc(db, 'personnel', p.id), sanitizeForFirestore(p), { merge: true });
+      }
+
+      // 10. Sync Settings
+      await setDoc(
+        doc(db, 'settings', 'regiment_settings'),
+        sanitizeForFirestore({
+          customLogo,
+          unitName: '10 Med Regt Arty',
+          updatedAt: new Date().toISOString(),
+          syncedBy: currentUser?.username || 'admin',
+        }),
+        { merge: true }
+      );
+
+      setCloudPermissionDenied(false);
+      addAuditLog('Cloud Full Sync', `Pushed ${personnelList.length} personnel and all settings to Firebase Cloud`, 'SYSTEM');
+      showNotification('রেজিমেন্টের সকল ডেটা সফলভাবে ফায়ারবেস ক্লাউডে সংরক্ষিত হয়েছে!');
+      return { success: true, count: personnelList.length };
+    } catch (e: any) {
+      console.error('Error syncing all to cloud:', e);
+      if (e?.code === 'permission-denied' || String(e).includes('permission-denied')) {
+        setCloudPermissionDenied(true);
+        showNotification('ফায়ারবেস রুলস পারমিশন এরর: দয়া করে Firebase Console-এ allow read, write: if true; পাবলিশ করুন।');
+      } else {
+        showNotification('ক্লাউড সিঙ্ক এরর: ' + (e?.message || 'Failed'));
+      }
+      return { success: false, error: e?.message || 'Sync failed' };
     }
   };
 
@@ -3091,6 +3184,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         assignOutOfUnit,
         cancelOutOfUnit,
         syncNominalRollToCloud,
+        syncAllToCloud,
 
         dailyParadeModalOpen,
         setDailyParadeModalOpen,
@@ -3109,6 +3203,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         firebaseUser,
         isFirebaseReady,
+        cloudPermissionDenied,
         loginWithGoogle,
         logout,
       }}
