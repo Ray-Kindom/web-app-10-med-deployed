@@ -129,34 +129,34 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-3">
+      <div className="max-w-[1700px] mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-between h-12 sm:h-13 gap-2.5">
           {/* Left: Mobile Menu Button & Brand */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={onToggleMobileNav}
-              className="lg:hidden p-2 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white"
+              className="lg:hidden p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white"
               aria-label="Open Navigation Menu"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4" />
             </button>
 
             <div
               onClick={() => setActivePage('main_dashboard')}
-              className="flex items-center gap-3 cursor-pointer group"
+              className="flex items-center gap-2 cursor-pointer group"
             >
-              <UnitLogo size="md" />
+              <UnitLogo size="sm" />
               <div className="hidden sm:flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-100 group-hover:text-white tracking-wide text-sm md:text-base font-sans leading-none">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-100 group-hover:text-white tracking-wide text-xs sm:text-sm font-sans leading-none">
                     10 Med Regt Arty
                   </span>
-                  <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded">
+                  <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[8px] font-mono font-bold uppercase px-1 py-0.2 rounded">
                     Born Destroyer
                   </span>
                 </div>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Smart Parade State & Personnel Dashboard
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Smart Parade State System
                 </span>
               </div>
             </div>

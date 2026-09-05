@@ -255,6 +255,23 @@ export interface ParadeTypeDefinition {
   deletedByRole?: 'Admin' | 'RSM' | string;
 }
 
+export type ParadeDutyCategory = 'Unit Sy' | 'working' | 'Fixed Duty' | 'Others';
+
+export interface ParadeDutyAssignment {
+  id: string;
+  personnelId: string;
+  snkNo: string; // Army No
+  name: string;
+  rank: string;
+  battery: Battery;
+  category: ParadeDutyCategory;
+  dutyName: string;
+  date: string;
+  sessionType: string;
+  assignedAt?: string;
+  assignedBy?: string;
+}
+
 export interface DateWiseParadeRecord {
   id: string; // [date]_[typeId]_[battery]
   date: string; // YYYY-MM-DD

@@ -17,7 +17,16 @@ import {
   Clock,
   X,
   Maximize2,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
+
+const PARADE_TYPE_DROPDOWN_OPTIONS = [
+  { id: 'Ni trg', label: '1. Ni trg', desc: 'Night Training (রাত্রীকালীন প্যারেড / নাইট ট্রেনিং)' },
+  { id: 'Darbar', label: '2. Darbar', desc: 'Regimental Darbar (দরবার প্যারেড)' },
+  { id: 'Tv Room', label: '3. Tv Room', desc: 'TV Room Roll Call (টিভি রুম সমাবেশ)' },
+  { id: 'Other', label: '4. Other', desc: 'Custom Name (কাস্টম নাম এন্ট্রি করুন)' },
+] as const;
 
 interface ParadeStatePageProps {
   onViewDossier: (person: Personnel) => void;
@@ -52,7 +61,9 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
 
   const [activeModalSession, setActiveModalSession] = useState<string | null>(null);
   const [isAddTypeModalOpen, setIsAddTypeModalOpen] = useState(false);
-  const [newTypeName, setNewTypeName] = useState('');
+  const [newTypeName, setNewTypeName] = useState('Ni trg');
+  const [selectedTypePreset, setSelectedTypePreset] = useState<string>('Ni trg');
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState<boolean>(false);
 
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
@@ -179,7 +190,78 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Prominent Regimental Header with Date Selector & Quick Entry */}
+      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+              CORE PARADE STATE MODULE
+            </span>
+            <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+              {isBsm ? `BSM Entry: ${assignedBty}` : 'Regimental Console (RSM / Admin)'}
+            </span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight font-sans mt-0.5">
+            Daily Parade State Console (দৈনিক প্যারেড স্টেট)
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Select a session card below or click Quick Entry to easily record attendance and muster strength
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick Date Switcher */}
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-700/80 shadow-inner">
+            <button
+              onClick={() => {
+                const d = new Date(selectedParadeDate);
+                d.setDate(d.getDate() - 1);
+                setSelectedParadeDate(d.toISOString().slice(0, 10));
+              }}
+              className="px-2 py-1 rounded-lg text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Previous Day"
+            >
+              ← Prev
+            </button>
+            <input
+              type="date"
+              value={selectedParadeDate}
+              onChange={(e) => e.target.value && setSelectedParadeDate(e.target.value)}
+              className="bg-transparent text-white font-mono font-bold text-xs px-2 py-1 focus:outline-none cursor-pointer"
+            />
+            <button
+              onClick={() => {
+                setSelectedParadeDate(new Date().toISOString().slice(0, 10));
+              }}
+              className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+              title="Today"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => {
+                const d = new Date(selectedParadeDate);
+                d.setDate(d.getDate() + 1);
+                setSelectedParadeDate(d.toISOString().slice(0, 10));
+              }}
+              className="px-2 py-1 rounded-lg text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Next Day"
+            >
+              Next →
+            </button>
+          </div>
+
+          {/* Primary Quick Entry Button */}
+          <button
+            onClick={() => setActiveModalSession(activeParadeTypes[0]?.name || 'Morning')}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-rose-950/50 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <span>⚡ Quick Entry (এন্ট্রি দিন)</span>
+          </button>
+        </div>
+      </div>
+
       {/* PRIMARY PARADE STATE TYPE BOXES/CARDS (Morning, Second Period, Games + Dynamic) */}
       <div className="space-y-2">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -200,24 +282,26 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
               <div
                 key={type.id}
                 onClick={() => setActiveModalSession(type.name)}
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 hover:border-rose-500/60 p-4 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-rose-950/30 cursor-pointer flex flex-col justify-between"
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border-2 border-slate-800 hover:border-rose-500 p-5 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-rose-950/40 cursor-pointer flex flex-col justify-between min-h-[260px]"
               >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 group-hover:scale-105 transition-transform flex items-center justify-center">
-                      {getParadeTypeIcon(type.name)}
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 group-hover:scale-110 group-hover:bg-rose-500/25 transition-all flex items-center justify-center shadow-lg shadow-rose-950/30">
+                        {getParadeTypeIcon(type.name)}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-white group-hover:text-rose-300 transition-colors font-sans leading-tight">
+                          {type.name} Parade State
+                        </h3>
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Date: <strong className="text-slate-200">{selectedParadeDate}</strong></span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border ${
-                          !isDefaultType
-                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                            : 'bg-slate-800/90 text-slate-400 border-slate-700/80'
-                        }`}
-                        title={`Created by: ${!isDefaultType ? 'RSM' : 'Admin'}`}
-                      >
-                        {!isDefaultType ? 'RSM' : 'Admin'}
-                      </span>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${badge.bg}`}>
                         {badge.text}
                       </span>
@@ -239,42 +323,51 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
                     </div>
                   </div>
 
-                  <div>
-                    <h3 className="text-base font-bold text-white group-hover:text-rose-300 transition-colors font-sans">
-                      {type.name}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-1">
-                      <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Date: <strong className="text-slate-200">{selectedParadeDate}</strong></span>
+                  {/* Highlighted Big Metric Box */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 flex items-center justify-between group-hover:border-emerald-500/40 transition-colors shadow-inner">
+                    <div>
+                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                        On Parade / হাজির
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-mono mt-0.5 block">
+                        {isBsm ? `${assignedBty} Strength` : 'Regimental Strength'}
+                      </span>
                     </div>
-                  </div>
-
-                  {/* Highlighted On Parade metric box */}
-                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-                    <span className="text-xs font-mono font-medium text-emerald-400 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      On Parade:
-                    </span>
                     <div className="text-right font-mono">
-                      <span className="text-base font-bold text-emerald-300">
+                      <span className="text-3xl sm:text-4xl font-black text-emerald-400 tracking-tight">
                         {stats.count}
                       </span>
-                      <span className="text-[10px] text-slate-500 ml-1">
-                        {isBsm ? `(${assignedBty})` : `(Regt)`}
+                      <span className="text-xs text-slate-400 ml-1 font-bold">
+                        Troops
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
-                  <span className="text-[10px] flex items-center gap-1 text-slate-400" title="Last Edit Time">
-                    <Clock className="w-3 h-3 text-slate-500" />
-                    <span>Last Edit: <strong className="text-slate-300">{stats.lastEditTime}</strong></span>
-                  </span>
-                  <span className="text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform text-[11px] flex items-center gap-1">
-                    <Maximize2 className="w-3 h-3 text-rose-400" />
-                    <span>Full Screen →</span>
-                  </span>
+                <div className="mt-4 space-y-3 pt-3 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                    <span className="text-[11px] flex items-center gap-1 text-slate-400">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Last Edit: <strong className="text-slate-300">{stats.lastEditTime}</strong></span>
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                      {!isDefaultType ? 'RSM Custom' : 'Standard'}
+                    </span>
+                  </div>
+
+                  {/* PROMINENT PRIMARY ACTION BUTTON */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveModalSession(type.name);
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 via-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-950/40 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    <span>⚡ Open &amp; Enter Parade State (এন্ট্রি দিন)</span>
+                    <span className="text-rose-200">→</span>
+                  </button>
                 </div>
               </div>
             );
@@ -284,8 +377,13 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
           {(isActualRsm || isAdmin) && (
             <div
               id="btn-add-new-parade-state-box"
-              onClick={() => setIsAddTypeModalOpen(true)}
-              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900/50 via-slate-900/70 to-slate-950 border-2 border-dashed border-slate-700/80 hover:border-purple-500/80 p-5 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-purple-950/30 cursor-pointer flex flex-col items-center justify-center min-h-[220px] text-center"
+              onClick={() => {
+                setSelectedTypePreset('Ni trg');
+                setNewTypeName('Ni trg');
+                setIsTypeDropdownOpen(false);
+                setIsAddTypeModalOpen(true);
+              }}
+              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900/50 via-slate-900/70 to-slate-950 border-2 border-dashed border-slate-700/80 hover:border-purple-500/80 p-5 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-purple-950/30 cursor-pointer flex flex-col items-center justify-center min-h-[260px] text-center"
             >
               <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/30 group-hover:scale-110 group-hover:bg-purple-500/20 group-hover:border-purple-500/50 transition-all flex items-center justify-center text-purple-400 mb-3 shadow-inner">
                 <Plus className="w-8 h-8" />
@@ -366,17 +464,137 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
               </button>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs text-slate-300 font-mono font-bold">
-                Parade State Name (e.g. Evening Muster, Special Inspection)
-              </label>
-              <input
-                type="text"
-                value={newTypeName}
-                onChange={(e) => setNewTypeName(e.target.value)}
-                placeholder="Enter Parade Type Name..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-              />
+            <div className="space-y-3 relative">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-slate-300 font-mono font-bold flex items-center gap-1.5">
+                  <span>Parade State Name (প্যারেড স্টেটের নাম)</span>
+                  <span className="text-purple-400 text-[10px] bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
+                    {selectedTypePreset === 'Other' ? 'Custom Entry' : 'Selected Preset'}
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsTypeDropdownOpen((prev) => !prev)}
+                  className="text-xs font-mono font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Select Option</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={newTypeName}
+                  onClick={() => setIsTypeDropdownOpen(true)}
+                  onChange={(e) => {
+                    setNewTypeName(e.target.value);
+                    if (selectedTypePreset !== 'Other') {
+                      setSelectedTypePreset('Other');
+                    }
+                  }}
+                  placeholder={
+                    selectedTypePreset === 'Other'
+                      ? 'Type custom parade state name (যেমন: Roll Call, Special Guard)...'
+                      : 'Click to open dropdown or select options below...'
+                  }
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 pr-10 text-white text-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 transition-all font-medium"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setIsTypeDropdownOpen((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Toggle Dropdown Menu"
+                >
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isTypeDropdownOpen ? 'rotate-180 text-purple-400' : ''}`} />
+                </button>
+
+                {/* Dropdown Options List */}
+                {isTypeDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl overflow-hidden p-1.5 space-y-1 animate-fadeIn">
+                    <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 border-b border-slate-800/80">
+                      Select Parade State Option (অপশন সিলেক্ট করুন)
+                    </div>
+                    {PARADE_TYPE_DROPDOWN_OPTIONS.map((opt) => {
+                      const isSelected = selectedTypePreset === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTypePreset(opt.id);
+                            if (opt.id === 'Other') {
+                              if (['Ni trg', 'Darbar', 'Tv Room'].includes(newTypeName)) {
+                                setNewTypeName('');
+                              }
+                            } else {
+                              setNewTypeName(opt.id);
+                            }
+                            setIsTypeDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-purple-600/25 text-purple-200 border border-purple-500/40 font-bold'
+                              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-bold flex items-center gap-2">
+                              <span>{opt.label}</span>
+                              {opt.id === 'Other' && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  Customize Name
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-slate-400 block mt-0.5">
+                              {opt.desc}
+                            </span>
+                          </div>
+                          {isSelected && <Check className="w-4 h-4 text-purple-400 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick 1-Click Selection Pills */}
+              <div className="space-y-1 pt-1">
+                <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                  Quick Select / দ্রুত নির্বাচন:
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {PARADE_TYPE_DROPDOWN_OPTIONS.map((opt) => {
+                    const isSelected = selectedTypePreset === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTypePreset(opt.id);
+                          if (opt.id === 'Other') {
+                            if (['Ni trg', 'Darbar', 'Tv Room'].includes(newTypeName)) {
+                              setNewTypeName('');
+                            }
+                          } else {
+                            setNewTypeName(opt.id);
+                          }
+                          setIsTypeDropdownOpen(false);
+                        }}
+                        className={`px-2 py-1.5 rounded-lg text-xs font-mono transition-all border text-center cursor-pointer ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-purple-500 font-bold shadow-sm'
+                            : 'bg-slate-950/80 text-slate-300 border-slate-800 hover:text-white hover:border-slate-600'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
@@ -388,13 +606,19 @@ export const ParadeStatePage: React.FC<ParadeStatePageProps> = ({
               </button>
               <button
                 onClick={() => {
-                  if (newTypeName.trim()) {
-                    addParadeType(newTypeName.trim());
-                    setNewTypeName('');
+                  const finalName = newTypeName.trim() || (selectedTypePreset !== 'Other' ? selectedTypePreset : '');
+                  if (finalName) {
+                    addParadeType(finalName);
+                    setNewTypeName('Ni trg');
+                    setSelectedTypePreset('Ni trg');
+                    setIsTypeDropdownOpen(false);
                     setIsAddTypeModalOpen(false);
+                    showNotification(`✅ Added new parade state: ${finalName}`);
+                  } else {
+                    showNotification('⚠️ Please specify or type a parade state name');
                   }
                 }}
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5 transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Save & Publish</span>

@@ -116,8 +116,8 @@ export const TopModuleNavBar: React.FC = () => {
   }
 
   return (
-    <div className="sticky top-16 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 py-2 mb-4">
-      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar max-w-6xl mx-auto">
+    <div className="sticky top-12 sm:top-13 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-4 py-1 mb-2">
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-[1700px] mx-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activePage === tab.id;
@@ -125,9 +125,9 @@ export const TopModuleNavBar: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => (tab.action ? tab.action() : setActivePage(tab.id))}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 isActive
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-950/40 border border-rose-500'
+                  ? 'bg-rose-600 text-white shadow-sm border border-rose-500 font-bold'
                   : 'bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800'
               }`}
             >

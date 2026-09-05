@@ -578,6 +578,20 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
               />
             </div>
 
+            {/* Direct Quick Save Button in Header */}
+            {!isReadOnly && (
+              <button
+                onClick={() => {
+                  showNotification('✅ Parade State Saved & Synchronized successfully.');
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition-all cursor-pointer shadow-md shadow-emerald-950/40 hover:scale-105 active:scale-95"
+                title="Save & Sync Parade State (সেভ করুন)"
+              >
+                <Check className="w-4 h-4 text-white" />
+                <span>Save State</span>
+              </button>
+            )}
+
             {/* Download State Button */}
             <button
               onClick={handleDownloadState}
@@ -1013,10 +1027,10 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                     </>
                   ) : (
                     <>
-                      <th className="py-3 px-4 text-center w-28">Offr (অফিসার)</th>
-                      <th className="py-3 px-4 text-center w-28">JCO (জেসিও)</th>
-                      <th className="py-3 px-4 text-center w-28">OR (সৈনিক)</th>
-                      <th className="py-3 px-4 text-right font-bold text-rose-300 w-36 bg-slate-900/60">
+                      <th className="py-3.5 px-4 text-center w-36 sm:w-44 text-slate-300 font-bold">Offr (অফিসার)</th>
+                      <th className="py-3.5 px-4 text-center w-36 sm:w-44 text-slate-300 font-bold">JCO (জেসিও)</th>
+                      <th className="py-3.5 px-4 text-center w-36 sm:w-44 text-slate-300 font-bold">OR (সৈনিক)</th>
+                      <th className="py-3.5 px-4 text-right font-bold text-rose-300 w-40 sm:w-48 bg-slate-900/80">
                         Total / যোগফল
                       </th>
                     </>
@@ -1048,47 +1062,47 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                         key={pt.id}
                         className={`transition-colors ${
                           isMainParade
-                            ? 'bg-emerald-950/20 hover:bg-emerald-950/30'
+                            ? 'bg-emerald-950/25 hover:bg-emerald-950/35 border-l-4 border-l-emerald-500'
                             : 'hover:bg-slate-900/60'
                         }`}
                       >
-                        <td className="py-2.5 px-3 text-center text-slate-500 font-mono">
+                        <td className="py-3 px-3 text-center text-slate-500 font-mono text-sm">
                           {idx + 1}
                         </td>
-                        <td className="py-2.5 px-4 font-bold text-slate-200">
+                        <td className="py-3 px-4 font-bold text-slate-200">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={isMainParade ? 'text-emerald-300 font-black' : ''}>
+                            <span className={isMainParade ? 'text-emerald-300 font-black text-sm sm:text-base' : 'text-sm text-slate-200'}>
                               {pt.name}
                             </span>
                             {isMainParade && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 uppercase tracking-wider">
                                 MAIN PT
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
+                        <td className="py-3 px-3 text-center font-mono text-slate-300 bg-slate-950/20 text-sm">
                           {hq.offr + hq.jco + hq.or}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
+                        <td className="py-3 px-3 text-center font-mono text-slate-300 bg-slate-950/20 text-sm">
                           {p.offr + p.jco + p.or}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
+                        <td className="py-3 px-3 text-center font-mono text-slate-300 bg-slate-950/20 text-sm">
                           {q.offr + q.jco + q.or}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-300 bg-slate-950/20">
+                        <td className="py-3 px-3 text-center font-mono text-slate-300 bg-slate-950/20 text-sm">
                           {r.offr + r.jco + r.or}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-300">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-300 text-sm">
                           {ptTotalOffr}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-300">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-300 text-sm">
                           {ptTotalJco}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-300">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-300 text-sm">
                           {ptTotalOr}
                         </td>
-                        <td className="py-2.5 px-4 text-right font-mono font-extrabold text-white text-sm bg-slate-900/40">
+                        <td className="py-3 px-4 text-right font-mono font-black text-white text-base bg-slate-900/40">
                           {ptGrand}
                         </td>
                       </tr>
@@ -1110,20 +1124,20 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                         isLockedByRsm
                           ? 'bg-amber-950/10'
                           : isMainParade
-                          ? 'bg-emerald-950/20 hover:bg-emerald-950/30'
+                          ? 'bg-emerald-950/25 hover:bg-emerald-950/35 border-l-4 border-l-emerald-500'
                           : 'hover:bg-slate-900/60'
                       }`}
                     >
-                      <td className="py-2.5 px-3 text-center text-slate-500 font-mono">
+                      <td className="py-3 px-3 text-center text-slate-500 font-mono text-sm font-semibold">
                         {idx + 1}
                       </td>
-                      <td className="py-2.5 px-4 font-bold text-slate-200">
+                      <td className="py-3 px-4 font-bold text-slate-200">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={isMainParade ? 'text-emerald-300 font-black' : ''}>
+                          <span className={isMainParade ? 'text-emerald-300 font-black text-sm sm:text-base' : 'text-sm font-bold text-slate-200'}>
                             {pt.name}
                           </span>
                           {isMainParade && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 uppercase tracking-wider">
                               MAIN PT
                             </span>
                           )}
@@ -1140,9 +1154,9 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                           )}
                         </div>
                       </td>
-                      <td className="py-2 px-3 text-center">
+                      <td className="py-2.5 px-3 text-center">
                         {isReadOnly ? (
-                          <span className="inline-block min-w-12 py-1 px-2 font-mono font-bold text-slate-200 text-xs bg-slate-950/80 rounded-lg border border-slate-800">
+                          <span className="inline-block min-w-16 py-2 px-3 font-mono font-black text-slate-100 text-base bg-slate-950/80 rounded-xl border border-slate-800 shadow-inner">
                             {currentCounts.offr}
                           </span>
                         ) : (
@@ -1151,20 +1165,21 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                             min="0"
                             disabled={isInputDisabled}
                             value={currentCounts.offr}
+                            onFocus={(e) => e.target.select()}
                             onChange={(e) =>
                               handleCountChange(pt.id, activeTab, 'offr', e.target.value)
                             }
-                            className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
+                            className={`w-28 sm:w-36 border-2 rounded-xl py-2 px-3 text-center font-mono font-black text-base sm:text-lg transition-all shadow-inner focus:outline-none ${
                               isInputDisabled
-                                ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
-                                : 'bg-slate-950 border-slate-700 text-white'
+                                ? 'bg-slate-900/60 border-slate-800 text-slate-500 cursor-not-allowed'
+                                : 'bg-slate-950 border-slate-700 text-white hover:border-slate-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/40'
                             }`}
                           />
                         )}
                       </td>
-                      <td className="py-2 px-3 text-center">
+                      <td className="py-2.5 px-3 text-center">
                         {isReadOnly ? (
-                          <span className="inline-block min-w-12 py-1 px-2 font-mono font-bold text-slate-200 text-xs bg-slate-950/80 rounded-lg border border-slate-800">
+                          <span className="inline-block min-w-16 py-2 px-3 font-mono font-black text-slate-100 text-base bg-slate-950/80 rounded-xl border border-slate-800 shadow-inner">
                             {currentCounts.jco}
                           </span>
                         ) : (
@@ -1173,20 +1188,21 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                             min="0"
                             disabled={isInputDisabled}
                             value={currentCounts.jco}
+                            onFocus={(e) => e.target.select()}
                             onChange={(e) =>
                               handleCountChange(pt.id, activeTab, 'jco', e.target.value)
                             }
-                            className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
+                            className={`w-28 sm:w-36 border-2 rounded-xl py-2 px-3 text-center font-mono font-black text-base sm:text-lg transition-all shadow-inner focus:outline-none ${
                               isInputDisabled
-                                ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
-                                : 'bg-slate-950 border-slate-700 text-white'
+                                ? 'bg-slate-900/60 border-slate-800 text-slate-500 cursor-not-allowed'
+                                : 'bg-slate-950 border-slate-700 text-white hover:border-slate-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/40'
                             }`}
                           />
                         )}
                       </td>
-                      <td className="py-2 px-3 text-center">
+                      <td className="py-2.5 px-3 text-center">
                         {isReadOnly ? (
-                          <span className="inline-block min-w-12 py-1 px-2 font-mono font-bold text-slate-200 text-xs bg-slate-950/80 rounded-lg border border-slate-800">
+                          <span className="inline-block min-w-16 py-2 px-3 font-mono font-black text-slate-100 text-base bg-slate-950/80 rounded-xl border border-slate-800 shadow-inner">
                             {currentCounts.or}
                           </span>
                         ) : (
@@ -1195,18 +1211,19 @@ export const DailyParadeStateModal: React.FC<DailyParadeStateModalProps> = ({
                             min="0"
                             disabled={isInputDisabled}
                             value={currentCounts.or}
+                            onFocus={(e) => e.target.select()}
                             onChange={(e) =>
                               handleCountChange(pt.id, activeTab, 'or', e.target.value)
                             }
-                            className={`w-20 border rounded-lg px-2 py-1 text-center font-mono font-bold focus:outline-none focus:border-rose-500 ${
+                            className={`w-28 sm:w-36 border-2 rounded-xl py-2 px-3 text-center font-mono font-black text-base sm:text-lg transition-all shadow-inner focus:outline-none ${
                               isInputDisabled
-                                ? 'bg-slate-900/60 border-slate-800 text-slate-400 cursor-not-allowed'
-                                : 'bg-slate-950 border-slate-700 text-white'
+                                ? 'bg-slate-900/60 border-slate-800 text-slate-500 cursor-not-allowed'
+                                : 'bg-slate-950 border-slate-700 text-white hover:border-slate-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/40'
                             }`}
                           />
                         )}
                       </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-extrabold text-rose-400 text-sm bg-slate-900/60">
+                      <td className="py-2.5 px-4 text-right font-mono font-black text-rose-400 text-lg sm:text-xl bg-slate-900/70">
                         {rowTotal}
                       </td>
                     </tr>

@@ -97,40 +97,40 @@ export const StatCard: React.FC<StatCardProps> = ({
       onClick={onClick}
       className={`relative overflow-hidden rounded-xl border bg-gradient-to-b ${scheme.bg} ${
         active ? 'ring-2 ring-rose-500/80 border-transparent' : scheme.border
-      } p-4 sm:p-5 shadow-lg ${scheme.glow} transition-all duration-200 ${
+      } p-2.5 sm:p-3 shadow-md ${scheme.glow} transition-all duration-200 ${
         onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block truncate">
             {title}
           </span>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-white">
+          <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-white">
               {value}
             </span>
             {percentage !== undefined && (
-              <span className={`text-xs font-semibold font-mono ${scheme.accent}`}>
+              <span className={`text-[11px] font-semibold font-mono ${scheme.accent}`}>
                 ({percentage}%)
               </span>
             )}
           </div>
           {subtitle && (
-            <p className="mt-1 text-xs text-slate-400 flex items-center gap-1 font-medium">
+            <p className="mt-0.5 text-[11px] text-slate-400 flex items-center gap-1 font-medium truncate">
               {subtitle}
             </p>
           )}
         </div>
 
-        <div className={`p-2.5 rounded-lg ${scheme.iconBg}`}>
-          <Icon className="w-5 h-5" />
+        <div className={`p-1.5 rounded-lg shrink-0 ${scheme.iconBg}`}>
+          <Icon className="w-4 h-4" />
         </div>
       </div>
 
       {badge && (
-        <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-          <span className="text-slate-400">{badge}</span>
+        <div className="mt-1.5 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
+          <span className="text-slate-400 truncate">{badge}</span>
         </div>
       )}
     </div>

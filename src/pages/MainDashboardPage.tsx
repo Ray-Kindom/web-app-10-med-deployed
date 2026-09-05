@@ -25,6 +25,8 @@ import {
   ChevronRight,
   UserCheck,
   Compass,
+  Tent,
+  Globe,
   Zap,
   Award,
   Crown,
@@ -49,6 +51,8 @@ export const MainDashboardPage: React.FC<MainDashboardPageProps> = ({
     setActivePage,
     setSelectedBatteryFilter,
     auditLogs,
+    setOutOfUnitModalOpen,
+    setActiveOutOfUnitCategory,
   } = useApp();
 
   const [selectedBattery, setSelectedBattery] = useState<Battery | 'All'>('All');
@@ -63,6 +67,32 @@ export const MainDashboardPage: React.FC<MainDashboardPageProps> = ({
   const summaries = getBatterySummaries();
   const isCO = currentUser.role === 'CO' || currentUser.role === '2IC';
   const isCoOrOffr = currentUser.role === 'CO' || currentUser.role === '2IC' || currentUser.role === 'Offr';
+
+  // Count personnel detailed to FDMN Camp
+  const fdmnCount = personnelList.filter((p) => {
+    if (p.outOfUnitCategory === 'FDMN') return true;
+    const details = (p.statusDetails || '').toLowerCase();
+    const loc = (p.outOfUnitLocation || '').toLowerCase();
+    const rem = (p.outOfUnitRemarks || '').toLowerCase();
+    return details.includes('fdmn') || loc.includes('fdmn') || rem.includes('fdmn') || loc.includes('camp') || details.includes('camp');
+  }).length;
+
+  // Count personnel detailed to Att & Msn (Attached / UN Mission)
+  const totalAttCount = personnelList.filter((p) => p.outOfUnitCategory === 'Att').length;
+  const totalMsnCount = personnelList.filter((p) => p.outOfUnitCategory === 'Msn').length;
+  const attMsnCount = totalAttCount + totalMsnCount;
+
+  // Count personnel detailed to Others Out (ERE, external postings & other duties)
+  const totalOthersOutCount = personnelList.filter((p) => {
+    if (p.outOfUnitCategory === 'ERE') return true;
+    if (p.outOfUnitCategory && !['Att', 'Msn', 'FDMN', 'CMH', 'Course', 'Comd', 'P/Lve', 'C/Lve'].includes(p.outOfUnitCategory)) return true;
+    if (p.status === 'Attached Out' && p.outOfUnitCategory !== 'Att' && p.outOfUnitCategory !== 'Msn' && p.outOfUnitCategory !== 'FDMN') return true;
+    if (p.status === 'AWOL/OSL') return true;
+    const details = (p.statusDetails || '').toLowerCase();
+    const loc = (p.outOfUnitLocation || '').toLowerCase();
+    const rem = (p.outOfUnitRemarks || '').toLowerCase();
+    return details.includes('ere') || loc.includes('ere') || rem.includes('ere');
+  }).length;
 
   const batteryList: { bty: Battery; name: string; shortCode: string; role: string }[] = [
     { bty: 'HQ Bty', name: 'HQ Battery (Headquarters)', shortCode: 'HQ', role: 'Command & Signals' },
@@ -211,8 +241,8 @@ export const MainDashboardPage: React.FC<MainDashboardPageProps> = ({
         </div>
       )}
 
-      {/* Regimental Key Performance Stat Cards - 7 Key Status Indicators */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
+      {/* Regimental Key Performance Stat Cards - 9 Key Status Indicators */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-3 sm:gap-4">
         <StatCard
           title="Posted Strength"
           value={totals.totalPosted}
@@ -228,7 +258,7 @@ export const MainDashboardPage: React.FC<MainDashboardPageProps> = ({
           }}
         />
         <StatCard
-          title="On Parade"
+          title="Present In Unit"
           value={totals.totalPresent}
           subtitle="In Unit Lines"
           icon={CheckCircle2}
@@ -237,13 +267,13 @@ export const MainDashboardPage: React.FC<MainDashboardPageProps> = ({
           onClick={() => setActivePage('parade_state')}
         />
         <StatCard
-          title="On Guard / Duty"
-          value={totals.totalDuty}
-          subtitle="Quarter Guard, RP"
-          icon={ShieldAlert}
-          colorScheme="blue"
-          badge="3 Shifts Active"
-          onClick={() => setActivePage('rsm_dashboard')}
+          title="Command"
+          value={totals.totalTempDuty + totals.totalAttached}
+          subtitle="TD & Attached"
+          icon={Compass}
+          colorScheme="indigo"
+          badge={totals.totalTempDuty + totals.totalAttached > 0 ? `${totals.totalTempDuty + totals.totalAttached} Out` : 'Nil Command'}
+          onClick={() => setIsComdModalOpen(true)}
         />
         <StatCard
           title="CMH/Sick"
@@ -273,13 +303,40 @@ export const MainDashboardPage: React.FC<MainDashboardPageProps> = ({
           onClick={() => setIsCourseModalOpen(true)}
         />
         <StatCard
-          title="COMD"
-          value={totals.totalTempDuty + totals.totalAttached}
-          subtitle="TD & Attached"
-          icon={Compass}
-          colorScheme="indigo"
-          badge={totals.totalTempDuty + totals.totalAttached > 0 ? `${totals.totalTempDuty + totals.totalAttached} Out` : 'Nil COMD'}
-          onClick={() => setIsComdModalOpen(true)}
+          title="FDMN Camp"
+          value={fdmnCount}
+          subtitle="Rohingya Camp Duty"
+          icon={Tent}
+          colorScheme="teal"
+          badge={fdmnCount > 0 ? `${fdmnCount} Soldiers` : 'Nil FDMN'}
+          onClick={() => {
+            setActiveOutOfUnitCategory('FDMN');
+            setOutOfUnitModalOpen(true);
+          }}
+        />
+        <StatCard
+          title="Att & Msn"
+          value={attMsnCount}
+          subtitle={`Att: ${totalAttCount} | Msn: ${totalMsnCount}`}
+          icon={Globe}
+          colorScheme="blue"
+          badge={attMsnCount > 0 ? `${attMsnCount} Out` : 'Nil Att/Msn'}
+          onClick={() => {
+            setActiveOutOfUnitCategory('Att');
+            setOutOfUnitModalOpen(true);
+          }}
+        />
+        <StatCard
+          title="Others Out"
+          value={totalOthersOutCount}
+          subtitle="ERE & Ext Duties"
+          icon={Building2}
+          colorScheme="orange"
+          badge={totalOthersOutCount > 0 ? `${totalOthersOutCount} Soldiers` : 'Nil Others'}
+          onClick={() => {
+            setActiveOutOfUnitCategory('ERE');
+            setOutOfUnitModalOpen(true);
+          }}
         />
       </div>
 

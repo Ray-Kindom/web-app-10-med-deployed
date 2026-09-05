@@ -14,6 +14,8 @@ import {
   ParadeTypeDefinition,
   DateWiseParadeRecord,
   ParadeRecordStatus,
+  ParadeDutyAssignment,
+  ParadeDutyCategory,
   SystemCategory,
   SubCategoryItem,
   SubUnitConfig,
@@ -178,6 +180,13 @@ interface AppContextType {
   confirmBatteryParadeRecord: (date: string, typeId: string, battery: Battery) => void;
   finalizeParadeType: (date: string, typeId: string) => void;
 
+  // Parade Duty Assignments (Heading boxes: Unit Sy, working, Fixed Duty, Others)
+  paradeDutyAssignments: Record<string, ParadeDutyAssignment[]>;
+  addParadeDutyAssignment: (assignment: Omit<ParadeDutyAssignment, 'id' | 'assignedAt' | 'assignedBy'>) => void;
+  removeParadeDutyAssignment: (id: string, date: string, sessionType: string) => void;
+  clearParadeDutyAssignments: (date: string, sessionType: string, category?: ParadeDutyCategory) => void;
+  getParadeDutyAssignments: (date: string, sessionType: string, category?: ParadeDutyCategory) => ParadeDutyAssignment[];
+
   // Out Of Unit Management
   assignOutOfUnit: (
     personnelId: string,
@@ -231,6 +240,7 @@ const STORAGE_KEYS = {
   PARADE_POINTS: '10med_parade_points_v1',
   PARADE_TYPES: '10med_parade_types_v1',
   PARADE_RECORDS: '10med_parade_records_v1',
+  PARADE_DUTY_ASSIGNMENTS: '10med_parade_duty_assignments_v1',
   AUTH_STATUS: '10med_auth_status_v2',
   ACTIVE_PAGE: '10med_active_page_v2',
   SYSTEM_CATEGORIES: '10med_system_categories_v1',
@@ -831,6 +841,128 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'Parade State Finalized',
       `${typeId} Parade State on ${date} formally finalized by ${currentUser.rank} ${currentUser.name}`,
       'PARADE_STATE'
+    );
+  };
+
+  // --- PARADE DUTY ASSIGNMENTS (Unit Sy, working, Fixed Duty, Others) ---
+  const [paradeDutyAssignments, setParadeDutyAssignments] = useState<
+    Record<string, ParadeDutyAssignment[]>
+  >(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PARADE_DUTY_ASSIGNMENTS);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {};
+  });
+
+  const getParadeDutyAssignments = (
+    date: string,
+    sessionType: string,
+    category?: ParadeDutyCategory
+  ): ParadeDutyAssignment[] => {
+    const key = `${date}_${sessionType}`;
+    const list = paradeDutyAssignments[key] || [];
+    if (category) {
+      return list.filter((a) => a.category === category);
+    }
+    return list;
+  };
+
+  const addParadeDutyAssignment = (
+    assignment: Omit<ParadeDutyAssignment, 'id' | 'assignedAt' | 'assignedBy'>
+  ) => {
+    const key = `${assignment.date}_${assignment.sessionType}`;
+    const id = `${assignment.personnelId}_${assignment.category}_${Date.now()}`;
+    const newRecord: ParadeDutyAssignment = {
+      ...assignment,
+      id,
+      assignedAt: new Date().toISOString(),
+      assignedBy: `${currentUser.rank} ${currentUser.name}`,
+    };
+
+    setParadeDutyAssignments((prev) => {
+      const existing = prev[key] || [];
+      // If already assigned to the exact same category, update their duty or prevent duplicate
+      const filtered = existing.filter(
+        (a) => !(a.personnelId === assignment.personnelId && a.category === assignment.category)
+      );
+      const next = { ...prev, [key]: [...filtered, newRecord] };
+      localStorage.setItem(STORAGE_KEYS.PARADE_DUTY_ASSIGNMENTS, JSON.stringify(next));
+      return next;
+    });
+
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_duty_assignments', key),
+        sanitizeForFirestore({
+          date: assignment.date,
+          sessionType: assignment.sessionType,
+          assignments: [
+            ...(paradeDutyAssignments[key] || []).filter(
+              (a) => !(a.personnelId === assignment.personnelId && a.category === assignment.category)
+            ),
+            newRecord,
+          ],
+        }),
+        { merge: true }
+      ),
+      'add parade duty assignment'
+    );
+  };
+
+  const removeParadeDutyAssignment = (id: string, date: string, sessionType: string) => {
+    const key = `${date}_${sessionType}`;
+    setParadeDutyAssignments((prev) => {
+      const existing = prev[key] || [];
+      const filtered = existing.filter((a) => a.id !== id);
+      const next = { ...prev, [key]: filtered };
+      localStorage.setItem(STORAGE_KEYS.PARADE_DUTY_ASSIGNMENTS, JSON.stringify(next));
+      return next;
+    });
+
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_duty_assignments', key),
+        sanitizeForFirestore({
+          date,
+          sessionType,
+          assignments: (paradeDutyAssignments[key] || []).filter((a) => a.id !== id),
+        }),
+        { merge: true }
+      ),
+      'remove parade duty assignment'
+    );
+  };
+
+  const clearParadeDutyAssignments = (
+    date: string,
+    sessionType: string,
+    category?: ParadeDutyCategory
+  ) => {
+    const key = `${date}_${sessionType}`;
+    setParadeDutyAssignments((prev) => {
+      const existing = prev[key] || [];
+      const nextList = category ? existing.filter((a) => a.category !== category) : [];
+      const next = { ...prev, [key]: nextList };
+      localStorage.setItem(STORAGE_KEYS.PARADE_DUTY_ASSIGNMENTS, JSON.stringify(next));
+      return next;
+    });
+
+    syncDoc(
+      setDoc(
+        doc(db, 'parade_duty_assignments', key),
+        sanitizeForFirestore({
+          date,
+          sessionType,
+          assignments: category
+            ? (paradeDutyAssignments[key] || []).filter((a) => a.category !== category)
+            : [],
+        }),
+        { merge: true }
+      ),
+      'clear parade duty assignments'
     );
   };
 
@@ -2783,6 +2915,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveParadeRecordCounts,
         confirmBatteryParadeRecord,
         finalizeParadeType,
+
+        // Parade Duty Assignments (Unit Sy, working, Fixed Duty, Others)
+        paradeDutyAssignments,
+        getParadeDutyAssignments,
+        addParadeDutyAssignment,
+        removeParadeDutyAssignment,
+        clearParadeDutyAssignments,
 
         assignOutOfUnit,
         cancelOutOfUnit,

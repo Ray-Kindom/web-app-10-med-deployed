@@ -129,7 +129,7 @@ const AppContent: React.FC = () => {
         onOpenPrintModal={() => setIsPrintModalOpen(true)}
       />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex max-w-[1700px] w-full mx-auto">
         {/* Responsive Sidebar */}
         <Sidebar
           isOpenMobile={isMobileNavOpen}
@@ -139,7 +139,7 @@ const AppContent: React.FC = () => {
         {/* Main Content Area */}
         <main className="flex-1 lg:pl-72 min-w-0 flex flex-col">
           <TopModuleNavBar />
-          <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">{renderActivePage()}</div>
+          <div className="p-2 sm:p-4 lg:p-5 max-w-[1700px] mx-auto w-full">{renderActivePage()}</div>
         </main>
       </div>
 

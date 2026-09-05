@@ -11,6 +11,10 @@ import {
   HeartPulse,
   PlaneTakeoff,
   Radio,
+  Compass,
+  Tent,
+  Globe,
+  Building2,
   X,
 } from 'lucide-react';
 
@@ -33,6 +37,8 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
     showNotification,
     addAuditLog,
     isGuest,
+    setOutOfUnitModalOpen,
+    setActiveOutOfUnitCategory,
   } = useApp();
 
   const [activeBattery, setActiveBattery] = useState<Battery>(
@@ -90,7 +96,30 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
   const dutyCount = btyPersonnel.filter((p) => p.status === 'On Duty').length;
   const sickCount = btyPersonnel.filter((p) => p.status === 'CMH/Sick').length;
   const leaveCount = btyPersonnel.filter((p) => p.status === 'Leave').length;
-  const courseCount = btyPersonnel.filter((p) => p.status === 'Course/Trg' || p.status === 'Temp Duty').length;
+  const courseCount = btyPersonnel.filter((p) => p.status === 'Course/Trg').length;
+  const comdCount = btyPersonnel.filter(
+    (p) => p.status === 'Temp Duty' || p.status === 'Attached Out' || Boolean(p.comdAssignment)
+  ).length;
+  const btyFdmnCount = btyPersonnel.filter((p) => {
+    if (p.outOfUnitCategory === 'FDMN') return true;
+    const details = (p.statusDetails || '').toLowerCase();
+    const loc = (p.outOfUnitLocation || '').toLowerCase();
+    const rem = (p.outOfUnitRemarks || '').toLowerCase();
+    return details.includes('fdmn') || loc.includes('fdmn') || rem.includes('fdmn') || loc.includes('camp') || details.includes('camp');
+  }).length;
+  const btyAttCount = btyPersonnel.filter((p) => p.outOfUnitCategory === 'Att').length;
+  const btyMsnCount = btyPersonnel.filter((p) => p.outOfUnitCategory === 'Msn').length;
+  const btyAttMsnCount = btyAttCount + btyMsnCount;
+  const btyOthersOutCount = btyPersonnel.filter((p) => {
+    if (p.outOfUnitCategory === 'ERE') return true;
+    if (p.outOfUnitCategory && !['Att', 'Msn', 'FDMN', 'CMH', 'Course', 'Comd', 'P/Lve', 'C/Lve'].includes(p.outOfUnitCategory)) return true;
+    if (p.status === 'Attached Out' && p.outOfUnitCategory !== 'Att' && p.outOfUnitCategory !== 'Msn' && p.outOfUnitCategory !== 'FDMN') return true;
+    if (p.status === 'AWOL/OSL') return true;
+    const details = (p.statusDetails || '').toLowerCase();
+    const loc = (p.outOfUnitLocation || '').toLowerCase();
+    const rem = (p.outOfUnitRemarks || '').toLowerCase();
+    return details.includes('ere') || loc.includes('ere') || rem.includes('ere');
+  }).length;
 
   const isBsm = ['P BSM', 'Q BSM', 'R BSM', 'HQ BSM'].includes(currentUser.role);
   const isRsm = currentUser.role === 'RSM' || currentUser.role === 'Admin';
@@ -100,8 +129,21 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
   const modalPersonnel = selectedStatFilter
     ? selectedStatFilter.status === 'All'
       ? btyPersonnel
-      : selectedStatFilter.status === 'Course/Trg'
-      ? btyPersonnel.filter((p) => p.status === 'Course/Trg' || p.status === 'Temp Duty')
+      : selectedStatFilter.status === 'Temp Duty'
+      ? btyPersonnel.filter((p) => p.status === 'Temp Duty' || p.status === 'Attached Out' || Boolean(p.comdAssignment))
+      : selectedStatFilter.status === 'AttMsn'
+      ? btyPersonnel.filter((p) => p.outOfUnitCategory === 'Att' || p.outOfUnitCategory === 'Msn')
+      : selectedStatFilter.status === 'OthersOut'
+      ? btyPersonnel.filter((p) => {
+          if (p.outOfUnitCategory === 'ERE') return true;
+          if (p.outOfUnitCategory && !['Att', 'Msn', 'FDMN', 'CMH', 'Course', 'Comd', 'P/Lve', 'C/Lve'].includes(p.outOfUnitCategory)) return true;
+          if (p.status === 'Attached Out' && p.outOfUnitCategory !== 'Att' && p.outOfUnitCategory !== 'Msn' && p.outOfUnitCategory !== 'FDMN') return true;
+          if (p.status === 'AWOL/OSL') return true;
+          const details = (p.statusDetails || '').toLowerCase();
+          const loc = (p.outOfUnitLocation || '').toLowerCase();
+          const rem = (p.outOfUnitRemarks || '').toLowerCase();
+          return details.includes('ere') || loc.includes('ere') || rem.includes('ere');
+        })
       : btyPersonnel.filter((p) => p.status === selectedStatFilter.status)
     : [];
 
@@ -142,7 +184,7 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
       </div>
 
       {/* Battery Stat Cards - adjusted with beautiful layout, clean spacing, and high contrast */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-3 sm:gap-4">
         <StatCard
           title="Posted in Bty"
           value={postedCount}
@@ -151,18 +193,18 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
           onClick={() => setSelectedStatFilter({ title: `${activeBattery} Posted Strength`, status: 'All' })}
         />
         <StatCard
-          title="Present On Parade"
+          title="Present In Unit"
           value={presentCount}
           icon={CheckCircle2}
           colorScheme="emerald"
-          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Present on Parade`, status: 'Present' })}
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Present in Unit`, status: 'Present' })}
         />
         <StatCard
-          title="On Guard / Duty"
-          value={dutyCount}
-          icon={ShieldAlert}
-          colorScheme="blue"
-          onClick={() => setSelectedStatFilter({ title: `${activeBattery} On Duty Troops`, status: 'On Duty' })}
+          title="Command"
+          value={comdCount}
+          icon={Compass}
+          colorScheme="indigo"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Command Troops (TD / Attached)`, status: 'Temp Duty' })}
         />
         <StatCard
           title="CMH / Sick"
@@ -179,11 +221,37 @@ export const BatteryDashboardPage: React.FC<BatteryDashboardPageProps> = ({
           onClick={() => setSelectedStatFilter({ title: `${activeBattery} Troops on Leave`, status: 'Leave' })}
         />
         <StatCard
-          title="Course / TD"
+          title="Course"
           value={courseCount}
           icon={Radio}
           colorScheme="cyan"
-          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Course / Temp Duty Personnel`, status: 'Course/Trg' })}
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Course / Cadres Personnel`, status: 'Course/Trg' })}
+        />
+        <StatCard
+          title="FDMN Camp"
+          value={btyFdmnCount}
+          icon={Tent}
+          colorScheme="teal"
+          onClick={() => {
+            setActiveOutOfUnitCategory('FDMN');
+            setOutOfUnitModalOpen(true);
+          }}
+        />
+        <StatCard
+          title="Att & Msn"
+          value={btyAttMsnCount}
+          subtitle={`Att: ${btyAttCount} | Msn: ${btyMsnCount}`}
+          icon={Globe}
+          colorScheme="blue"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Attached & UN Mission (${btyAttCount} Att + ${btyMsnCount} Msn = ${btyAttMsnCount})`, status: 'AttMsn' })}
+        />
+        <StatCard
+          title="Others Out"
+          value={btyOthersOutCount}
+          subtitle="ERE & Ext Duties"
+          icon={Building2}
+          colorScheme="orange"
+          onClick={() => setSelectedStatFilter({ title: `${activeBattery} Others Out (ERE & Ext Duties - ${btyOthersOutCount})`, status: 'OthersOut' })}
         />
       </div>
 
